@@ -19,11 +19,12 @@ Aussage aus einer Messung stammt, steht die Zahl dabei.
 7. [Wie der Start technisch abläuft](#7-wie-der-start-technisch-abläuft)
 8. [Modelle: woher sie kommen](#8-modelle-woher-sie-kommen)
 9. [Lokale Modelle mit Ollama](#9-lokale-modelle-mit-ollama)
-10. [Umgebungsvariablen](#10-umgebungsvariablen)
-11. [Dateien und Verzeichnisse](#11-dateien-und-verzeichnisse)
-12. [Diagnose-Rezepte](#12-diagnose-rezepte)
-13. [Bekannte Fallen](#13-bekannte-fallen)
-14. [Tests und Entwicklung](#14-tests-und-entwicklung)
+10. [Browser-Sitzungen](#10-browser-sitzungen)
+11. [Umgebungsvariablen](#11-umgebungsvariablen)
+12. [Dateien und Verzeichnisse](#12-dateien-und-verzeichnisse)
+13. [Diagnose-Rezepte](#13-diagnose-rezepte)
+14. [Bekannte Fallen](#14-bekannte-fallen)
+15. [Tests und Entwicklung](#15-tests-und-entwicklung)
 
 ---
 
@@ -301,7 +302,37 @@ Ein `"disabled": true` am Modell hat übrigens keine Wirkung: Das Feld gibt es i
 Schema nur unter `models.*.variants.*`, und `opencode models` listet ein so
 markiertes Modell weiterhin.
 
-## 10. Umgebungsvariablen
+## 10. Browser-Sitzungen
+
+CloudCLI bringt einen eigenen Browser mit (Reiter **Browser**) und meldet sich als
+MCP-Server bei allen Agenten an, sobald *Settings → Browser Use* eingeschaltet ist.
+Das ist das Gegenstück zu `@browser:newTab` in VS Code.
+
+**Eine Sitzung entsteht nur durch den Agenten.** Es gibt dafür weder einen Knopf noch
+eine REST-Route — der Agent ruft das MCP-Werkzeug `browser_create_session` auf. Im Chat
+also schlicht darum bitten. Der Browser-Reiter zeigt die laufenden Sitzungen und kann sie
+stoppen und löschen; erzeugen kann er keine.
+
+Wenn nichts passiert, sind es meist diese vier:
+
+| Prüfen | Wie |
+|---|---|
+| Ist die Laufzeit da? | `GET /api/browser-use/status`: `playwrightInstalled` und `chromiumInstalled` müssen `true` sein, sonst im Reiter installieren (oder `POST /api/browser-use/runtime/install`) |
+| Stimmt der Port im MCP-Eintrag? | Er wird beim Einschalten aus `SERVER_PORT` geschrieben. Läuft der Server auf 3010, der Eintrag aber auf 3001, redet der MCP-Server ins Leere: Browser Use einmal aus- und wieder einschalten |
+| Zu viele Sitzungen? | Höchstens drei je Besitzer (`CLOUDCLI_BROWSER_USE_MAX_SESSIONS_PER_OWNER`); alte im Reiter beenden |
+| Sitzung abgelaufen? | Nach 30 Minuten ohne Nutzung (`CLOUDCLI_BROWSER_USE_SESSION_TTL_MS`) |
+
+```bash
+TOKEN=$(node beispiele/token.cjs --print)
+BASE=http://127.0.0.1:3010/api/browser-use
+curl -s -H "Authorization: Bearer $TOKEN" $BASE/status
+curl -s -H "Authorization: Bearer $TOKEN" $BASE/sessions
+curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/sessions/<id>/stop
+curl -s -X DELETE -H "Authorization: Bearer $TOKEN" $BASE/sessions/<id>
+curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/runtime/install
+```
+
+## 11. Umgebungsvariablen
 
 | Variable | Wirkung |
 |---|---|
@@ -318,7 +349,7 @@ markiertes Modell weiterhin.
 | `OPENCODE_CONFIG` | zusätzliche OpenCode-Konfiguration |
 | `ELECTRON_RUN_AS_NODE` | muss **leer** sein, sonst startet kein Fenster (Abschnitt 13) |
 
-## 11. Dateien und Verzeichnisse
+## 12. Dateien und Verzeichnisse
 
 | Ort | Inhalt |
 |---|---|
@@ -329,7 +360,7 @@ markiertes Modell weiterhin.
 | `~/.claude/` | Verlauf von Claude Code, den CloudCLI in der Seitenleiste zeigt |
 | `dist/`, `dist-server/` | Bauergebnisse — von dort läuft der Server |
 
-## 12. Diagnose-Rezepte
+## 13. Diagnose-Rezepte
 
 **Läuft ein Server, und welcher Prozess ist es?**
 
@@ -386,7 +417,7 @@ Sitzungen er je Projekt hat):
 curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3010/api/projects
 ```
 
-## 13. Bekannte Fallen
+## 14. Bekannte Fallen
 
 | Symptom | Ursache und Abhilfe |
 |---|---|
@@ -401,7 +432,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3010/api/projects
 | `%~dp0` zeigt ins Falsche | In einer `.cmd` verschiebt `shift` auch `%0`. Den Pfad **vor** der Argumentschleife in eine Variable sichern |
 | „Der Befehl *bypass* ist … nicht gefunden" | Ein `&` in einer Adresse wird von cmd als Befehlstrenner gelesen — auch in Anführungszeichen, sobald es in einem Klammerblock steht. Ohne Klammern schreiben und mit `!VAR!` ausgeben |
 
-## 14. Tests und Entwicklung
+## 15. Tests und Entwicklung
 
 ```bash
 npm test           # Server (node:test über tsx)

@@ -19,11 +19,12 @@ measurement, the number is next to it.
 7. [How the start works](#7-how-the-start-works)
 8. [Models: where they come from](#8-models-where-they-come-from)
 9. [Local models with Ollama](#9-local-models-with-ollama)
-10. [Environment variables](#10-environment-variables)
-11. [Files and directories](#11-files-and-directories)
-12. [Diagnosis recipes](#12-diagnosis-recipes)
-13. [Known traps](#13-known-traps)
-14. [Tests and development](#14-tests-and-development)
+10. [Browser sessions](#10-browser-sessions)
+11. [Environment variables](#11-environment-variables)
+12. [Files and directories](#12-files-and-directories)
+13. [Diagnosis recipes](#13-diagnosis-recipes)
+14. [Known traps](#14-known-traps)
+15. [Tests and development](#15-tests-and-development)
 
 ---
 
@@ -290,7 +291,36 @@ A `"disabled": true` on a model has no effect, by the way: the schema only has
 that field under `models.*.variants.*`, and `opencode models` still lists a model
 marked that way.
 
-## 10. Environment variables
+## 10. Browser sessions
+
+CloudCLI brings a browser of its own (the **Browser** tab) and registers itself as an MCP
+server with every agent as soon as *Settings → Browser Use* is on. That is the counterpart
+to `@browser:newTab` in VS Code.
+
+**Only the agent creates a session.** There is no button and no REST route for it — the
+agent calls the MCP tool `browser_create_session`, so asking for it in the chat is the way.
+The browser tab lists running sessions and can stop and delete them; it cannot start one.
+
+When nothing happens, it is usually one of these four:
+
+| Check | How |
+|---|---|
+| Is the runtime there? | `GET /api/browser-use/status`: `playwrightInstalled` and `chromiumInstalled` must be `true`, otherwise install from the tab (or `POST /api/browser-use/runtime/install`) |
+| Does the MCP entry carry the right port? | It is written from `SERVER_PORT` when Browser Use is switched on. With the server on 3010 and the entry on 3001 the MCP server talks into the void: switch Browser Use off and on again |
+| Too many sessions? | Three per owner at most (`CLOUDCLI_BROWSER_USE_MAX_SESSIONS_PER_OWNER`); end the old ones in the tab |
+| Session expired? | After 30 minutes idle (`CLOUDCLI_BROWSER_USE_SESSION_TTL_MS`) |
+
+```bash
+TOKEN=$(node beispiele/token.cjs --print)
+BASE=http://127.0.0.1:3010/api/browser-use
+curl -s -H "Authorization: Bearer $TOKEN" $BASE/status
+curl -s -H "Authorization: Bearer $TOKEN" $BASE/sessions
+curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/sessions/<id>/stop
+curl -s -X DELETE -H "Authorization: Bearer $TOKEN" $BASE/sessions/<id>
+curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/runtime/install
+```
+
+## 11. Environment variables
 
 | Variable | Effect |
 |---|---|
@@ -307,7 +337,7 @@ marked that way.
 | `OPENCODE_CONFIG` | Additional OpenCode config file |
 | `ELECTRON_RUN_AS_NODE` | Must be **empty**, or no window starts (section 13) |
 
-## 11. Files and directories
+## 12. Files and directories
 
 | Location | Contents |
 |---|---|
@@ -318,7 +348,7 @@ marked that way.
 | `~/.claude/` | Claude Code's own history, which CloudCLI shows in the sidebar |
 | `dist/`, `dist-server/` | Build output — this is what the server runs |
 
-## 12. Diagnosis recipes
+## 13. Diagnosis recipes
 
 **Is a server running, and which process is it?**
 
@@ -374,7 +404,7 @@ sessions each project has):
 curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3010/api/projects
 ```
 
-## 13. Known traps
+## 14. Known traps
 
 | Symptom | Cause and remedy |
 |---|---|
@@ -389,7 +419,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3010/api/projects
 | `%~dp0` points at the wrong place | In a `.cmd`, `shift` moves `%0` as well. Save the path into a variable **before** the argument loop |
 | "The command *bypass* is … not found" | An `&` in an address is read as a command separator by cmd — even in quotes, once it sits inside a parenthesised block. Write it without parentheses and print it with `!VAR!` |
 
-## 14. Tests and development
+## 15. Tests and development
 
 ```bash
 npm test           # server (node:test through tsx)
