@@ -33,6 +33,7 @@ import CommandMenu from './CommandMenu';
 import ActivityIndicator from './ActivityIndicator';
 import ComposerAttachment from './ComposerAttachment';
 import VoiceInputButton from './VoiceInputButton';
+import BrowserTabButton from './BrowserTabButton';
 import PermissionRequestsBanner from './PermissionRequestsBanner';
 import TokenUsageSummary from './TokenUsageSummary';
 import QueuedMessageCard from './QueuedMessageCard';
@@ -417,6 +418,8 @@ export default function ChatComposer({
             {onVoiceTranscript && voiceAvailable && (
               <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />
             )}
+
+            <BrowserTabButton />
 
             <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage} />
 

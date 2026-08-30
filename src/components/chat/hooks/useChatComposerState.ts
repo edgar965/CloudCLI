@@ -30,6 +30,7 @@ import type {
 } from '../types/types';
 import type { Project, ProjectSession, LLMProvider, ProviderModelOption } from '../../../types/app';
 import { escapeRegExp } from '../utils/chatFormatting';
+import { openChromeTab } from '../utils/chromeTab';
 
 import { useFileMentions } from './useFileMentions';
 import { type SlashCommand, useSlashCommands } from './useSlashCommands';
@@ -404,6 +405,23 @@ export function useChatComposerState({
         return;
       }
 
+      // "/browser" never becomes a prompt, whichever way it was reached - typed
+      // and submitted, or picked from the command menu, which lands here.
+      if (command.name === '/browser') {
+        const typed = rawInput ?? input;
+        const url = typed.replace(/^\s*\/browser\s*/i, '').trim();
+        setInput('');
+        inputValueRef.current = '';
+        void openChromeTab(url).catch((error: unknown) => {
+          addMessage({
+            type: 'assistant',
+            content: error instanceof Error ? error.message : String(error),
+            timestamp: Date.now(),
+          });
+        });
+        return;
+      }
+
       try {
         const effectiveInput = rawInput ?? input;
         const commandMatch = effectiveInput.match(new RegExp(`${escapeRegExp(command.name)}\\s*(.*)`));
@@ -773,6 +791,26 @@ export function useChatComposerState({
       // Intercept slash commands only when "/" is the first input character.
       // Also accept exact "help" as a convenience alias for users who expect CLI-style help.
       const commandInput = currentInput.trimEnd();
+
+      // "/browser" never reaches the model. Every other slash command is
+      // expanded to text and sent as a prompt, so each of its tool calls costs
+      // a model turn - measured, that is where the wait came from, not from
+      // Chrome (a cold connection to an open tab is 1.9 s, a warm one 0.4 s).
+      // The VS Code extension has the same split: "@browser:newTab" is a ui
+      // message that calls its MCP client directly, not a prompt.
+      if (/^\/browser(\s|$)/i.test(commandInput)) {
+        const url = commandInput.replace(/^\/browser\s*/i, '').trim();
+        setInput('');
+        inputValueRef.current = '';
+        resetCommandMenuState();
+        setIsTextareaExpanded(false);
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+        }
+        void openChromeTab(url);
+        return;
+      }
+
       const isHelpAlias = commandInput.trim().toLowerCase() === 'help';
       if (commandInput.startsWith('/') || isHelpAlias) {
         const firstSpace = commandInput.indexOf(' ');
