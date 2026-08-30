@@ -36,16 +36,45 @@ function applyBypassPermissions() {
 }
 
 /**
- * Reads `?token=` and `?bypass=` from the start url and applies them.
+ * Provider, model and reasoning effort, in the keys the chat itself writes.
+ *
+ * Taken from `useChatProviderState`, not invented here: the provider lives in
+ * `selected-provider`, the model in `<provider>-model` and the effort in
+ * `<provider>-effort`. Writing the same keys means the menus next to the
+ * message box come up on those values.
+ */
+function applyModelChoice(provider, model, effort) {
+  if (provider) {
+    localStorage.setItem('selected-provider', provider);
+  }
+
+  const target = provider || localStorage.getItem('selected-provider') || 'claude';
+  if (model) {
+    localStorage.setItem(`${target}-model`, model);
+  }
+  if (effort) {
+    localStorage.setItem(`${target}-effort`, effort);
+  }
+}
+
+/**
+ * Reads the handover parameters from the start url and applies them.
  *
  * `token` is a login handed over from a launcher, `bypass=1` turns off the
- * permission prompts the same way the setting in the ui does.
+ * permission prompts the same way the setting in the ui does, and
+ * `provider`/`model`/`effort` preselect what a fresh profile would otherwise
+ * fall back to. Values are not checked against the catalog here - the menus
+ * show what the provider actually offers, and an unknown one is visible there
+ * rather than silently swallowed.
  */
 export function applyUrlHandover() {
   try {
     const startUrl = new URL(window.location.href);
     const token = startUrl.searchParams.get('token');
     const bypass = startUrl.searchParams.get('bypass');
+    const provider = startUrl.searchParams.get('provider');
+    const model = startUrl.searchParams.get('model');
+    const effort = startUrl.searchParams.get('effort');
 
     if (token) {
       localStorage.setItem('auth-token', token);
@@ -59,7 +88,14 @@ export function applyUrlHandover() {
       startUrl.searchParams.delete('bypass');
     }
 
-    if (token || bypass !== null) {
+    if (provider || model || effort) {
+      applyModelChoice(provider, model, effort);
+      for (const name of ['provider', 'model', 'effort']) {
+        startUrl.searchParams.delete(name);
+      }
+    }
+
+    if (token || bypass !== null || provider || model || effort) {
       window.history.replaceState({}, '', `${startUrl.pathname}${startUrl.search}${startUrl.hash}`);
     }
   } catch (error) {

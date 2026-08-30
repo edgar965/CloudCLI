@@ -8,6 +8,7 @@ rem   cloudcli-projekt.cmd "A:\projekt" --fragen    MIT Rueckfragen
 rem   cloudcli-projekt.cmd . --name arbeit          eigener Fenstername
 rem   cloudcli-projekt.cmd . --browser              statt Fenster im Browser
 rem   cloudcli-projekt.cmd . --port 3011            anderer Port
+rem   cloudcli-projekt.cmd . --modell sonnet --reasoning max
 rem   cloudcli-projekt.cmd . --nur-adresse          nur die Adresse zeigen
 rem
 rem Was passiert:
@@ -45,6 +46,9 @@ set "ZIEL="
 set "NAME="
 set "PORT=3010"
 set "BYPASS=1"
+set "PROVIDER=claude"
+set "MODELL=opus"
+set "REASONING=high"
 set "BROWSER=0"
 set "NURADRESSE=0"
 
@@ -61,6 +65,10 @@ if /i "%~1"=="--browser"     ( set "BROWSER=1"     & shift & goto :argumente )
 if /i "%~1"=="--nur-adresse" ( set "NURADRESSE=1"  & shift & goto :argumente )
 if /i "%~1"=="--name"        ( set "NAME=%~2"      & shift & shift & goto :argumente )
 if /i "%~1"=="--port"        ( set "PORT=%~2"      & shift & shift & goto :argumente )
+if /i "%~1"=="--provider"    ( set "PROVIDER=%~2"  & shift & shift & goto :argumente )
+if /i "%~1"=="--modell"      ( set "MODELL=%~2"    & shift & shift & goto :argumente )
+if /i "%~1"=="--model"       ( set "MODELL=%~2"    & shift & shift & goto :argumente )
+if /i "%~1"=="--reasoning"   ( set "REASONING=%~2" & shift & shift & goto :argumente )
 if not defined ZIEL ( set "ZIEL=%~1" & shift & goto :argumente )
 echo FEHLER: Unbekanntes Argument "%~1".
 goto :abbruch
@@ -103,9 +111,29 @@ set "STARTPFAD=/project/%PFAD%"
 if defined TOKEN set "STARTPFAD=%STARTPFAD%?token=%TOKEN%"
 rem Kein Klammerblock hier: cmd liest das ^& in der Adresse sonst als
 rem Befehlstrenner, auch in Anfuehrungszeichen.
-if not "%BYPASS%"=="1" goto :adressefertig
-if defined TOKEN set "STARTPFAD=%STARTPFAD%&bypass=1"
-if not defined TOKEN set "STARTPFAD=%STARTPFAD%?bypass=1"
+rem Der erste Parameter haengt mit ?, jeder weitere mit ^&. Jede Zuweisung,
+rem die ein ^& enthaelt, steht allein auf ihrer Zeile: hinter einem "if" oder
+rem in einem ( ... ) Block liest cmd es als Befehlstrenner, auch in
+rem Anfuehrungszeichen.
+set "TRENNER=?"
+if not defined TOKEN goto :trennerfertig
+set "TRENNER=&"
+:trennerfertig
+
+if not "%BYPASS%"=="1" goto :nachbypass
+call :anhaengen "bypass=1"
+:nachbypass
+
+if not defined PROVIDER goto :nachprovider
+call :anhaengen "provider=%PROVIDER%"
+:nachprovider
+
+if not defined MODELL goto :nachmodell
+call :anhaengen "model=%MODELL%"
+:nachmodell
+
+if not defined REASONING goto :adressefertig
+call :anhaengen "effort=%REASONING%"
 :adressefertig
 
 rem Ausgabe mit verzoegerter Expansion, sonst zerlegt das ^& die Zeile.
@@ -178,6 +206,12 @@ rem Ohne /wait: das Fenster laeuft eigenstaendig weiter, diese Datei ist fertig.
 start "" "%QUELLE%\node_modules\electron\dist\electron.exe" "%QUELLE%\electron\main.js" --user-data-dir="%PROFIL%"
 goto :ende
 
+rem Haengt einen Parameter an die Startadresse und schaltet danach auf ^&.
+:anhaengen
+set "STARTPFAD=%STARTPFAD%%TRENNER%%~1"
+set "TRENNER=&"
+goto :eof
+
 :hilfe
 echo CloudCLI fuer ein Projektverzeichnis oeffnen.
 echo.
@@ -195,6 +229,12 @@ echo   --name ^<name^>     Fenstername und Profil (Vorgabe: Verzeichnisname).
 echo                     Zweimal derselbe Name heisst dasselbe Profil - das
 echo                     zweite Fenster geht dann nicht auf.
 echo   --port ^<port^>     Port des Servers (Vorgabe 3010).
+echo   --provider ^<name^> claude ^(Vorgabe^), opencode, cursor, codex.
+echo   --modell ^<name^>   Modell. Vorgabe "opus" ^(Opus 5^); weitere:
+echo                     opus[1m], sonnet, sonnet[1m], fable, best,
+echo                     haiku, opusplan, default.
+echo   --reasoning ^<st^>  Denkstufe: low, medium, high ^(Vorgabe^),
+echo                     xhigh, max. Haiku kennt keine.
 echo   --browser         im Standardbrowser oeffnen statt als Fenster.
 echo   --nur-adresse     nur die Startadresse ausgeben, nichts starten.
 echo   help, --help      diese Hilfe.
