@@ -11,6 +11,7 @@ import {
   type ModelOverride,
   type ModelOverrides,
 } from '@/modules/providers/list/opencode/opencode-model-overrides.js';
+import { readConfiguredModelContextLimits } from '@/modules/providers/list/opencode/opencode-config-models.js';
 
 /**
  * The settings page for OpenCode models: what the catalog offers, what each
@@ -95,6 +96,16 @@ export const openCodeModelSettingsService = {
       throw invalid('model must be a routed id like "ollama/qwen3.8:27b"');
     }
 
+    // The id ends up as two object keys and in a config another program reads,
+    // so it has to be one OpenCode would actually route. An empty catalog means
+    // the list could not be read at all - then a stored setting is still better
+    // than a refusal the user cannot act on.
+    const supported = await new OpenCodeProviderModels().getSupportedModels();
+    const values = (supported.OPTIONS ?? []).map((option) => option.value);
+    if (values.length > 0 && !values.includes(model)) {
+      throw invalid(`${model} is not a model OpenCode offers`);
+    }
+
     const override: ModelOverride = {
       temperature: parseOptionalNumber(body.temperature, 'temperature', TEMPERATURE_RANGE),
       topP: parseOptionalNumber(body.topP, 'topP', TOP_P_RANGE),
@@ -108,6 +119,21 @@ export const openCodeModelSettingsService = {
     }
     if (known?.maxOutput && override.maxOutput !== undefined && override.maxOutput > known.maxOutput) {
       throw invalid(`${model} answers with at most ${known.maxOutput} tokens`);
+    }
+
+    // An output limit is only writable together with the context window, so it
+    // is looked up here: the catalog first, then the user's own config, which
+    // is the only place a locally served model is described.
+    if (override.maxOutput !== undefined) {
+      const configured = await readConfiguredModelContextLimits();
+      const contextLimit = known?.contextLimit ?? configured[model];
+      if (contextLimit === undefined) {
+        throw invalid(
+          `${model} has no known context window, and OpenCode rejects an output limit without one`
+          + ' - add "limit": { "context": ... } for the model in your opencode.json.',
+        );
+      }
+      override.contextLimit = contextLimit;
     }
 
     await writeModelOverride(model, override);

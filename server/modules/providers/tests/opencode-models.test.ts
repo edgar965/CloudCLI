@@ -5,11 +5,31 @@ import {
   OpenCodeProviderModels,
   OPENCODE_PREDEFINED_MODELS,
 } from '@/modules/providers/list/opencode/opencode-models.provider.js';
+import { resetOpenCodeConfigModelCache } from '@/modules/providers/list/opencode/opencode-config-models.js';
 
-test('OpenCode exposes only the curated predefined catalog', async () => {
+test('without a local config, OpenCode exposes only the curated predefined catalog', async () => {
   const adapter = new OpenCodeProviderModels();
 
-  assert.deepEqual(await adapter.getSupportedModels(), OPENCODE_PREDEFINED_MODELS);
+  // The catalog also carries what the developer's own OpenCode config
+  // declares, so this assertion has to say which of the two it is testing.
+  // Without the switch the test passes on CI, where there is no config, and
+  // fails on any machine that uses OpenCode - the machine, not the code,
+  // decides the outcome.
+  const previous = process.env.CLOUDCLI_OPENCODE_CONFIG_MODELS;
+  process.env.CLOUDCLI_OPENCODE_CONFIG_MODELS = '0';
+  resetOpenCodeConfigModelCache();
+
+  try {
+    assert.deepEqual(await adapter.getSupportedModels(), OPENCODE_PREDEFINED_MODELS);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.CLOUDCLI_OPENCODE_CONFIG_MODELS;
+    } else {
+      process.env.CLOUDCLI_OPENCODE_CONFIG_MODELS = previous;
+    }
+    resetOpenCodeConfigModelCache();
+  }
+
   assert.equal(
     (await adapter.getCurrentActiveModel()).model,
     OPENCODE_PREDEFINED_MODELS.DEFAULT,
