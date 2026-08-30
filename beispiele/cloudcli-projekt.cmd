@@ -49,6 +49,7 @@ set "BYPASS=1"
 set "PROVIDER=claude"
 set "MODELL=opus"
 set "REASONING=high"
+set "DIKTAT=1"
 set "BROWSER=0"
 set "NURADRESSE=0"
 
@@ -69,6 +70,7 @@ if /i "%~1"=="--provider"    ( set "PROVIDER=%~2"  & shift & shift & goto :argum
 if /i "%~1"=="--modell"      ( set "MODELL=%~2"    & shift & shift & goto :argumente )
 if /i "%~1"=="--model"       ( set "MODELL=%~2"    & shift & shift & goto :argumente )
 if /i "%~1"=="--reasoning"   ( set "REASONING=%~2" & shift & shift & goto :argumente )
+if /i "%~1"=="--kein-diktat" ( set "DIKTAT=0"      & shift & goto :argumente )
 if not defined ZIEL ( set "ZIEL=%~1" & shift & goto :argumente )
 echo FEHLER: Unbekanntes Argument "%~1".
 goto :abbruch
@@ -132,8 +134,12 @@ if not defined MODELL goto :nachmodell
 call :anhaengen "model=%MODELL%"
 :nachmodell
 
-if not defined REASONING goto :adressefertig
+if not defined REASONING goto :nachreasoning
 call :anhaengen "effort=%REASONING%"
+:nachreasoning
+
+if not "%DIKTAT%"=="1" goto :adressefertig
+call :anhaengen "voice=1"
 :adressefertig
 
 rem Ausgabe mit verzoegerter Expansion, sonst zerlegt das ^& die Zeile.
@@ -154,6 +160,16 @@ if not errorlevel 1 (
 echo Starte den Server auf 127.0.0.1:%PORT% ...
 rem Kein "cd ... && npm" im Argument: das kaufmaennische Und laesst sich durch
 rem cmd und PowerShell hindurch nicht zuverlaessig durchreichen.
+rem Diktat: CloudCLIs Voice-Proxy spricht die OpenAI-Schnittstelle, und Groq
+rem bietet sie mit Whisper an. Ein vorhandener GROQ_API_KEY wird durchgereicht,
+rem nicht hier abgelegt. Ohne das bleibt nur die Spracherkennung des Browsers,
+rem die im Electron-Fenster fehlt.
+if not defined GROQ_API_KEY goto :ohnediktat
+if defined VOICE_API_KEY goto :ohnediktat
+set "VOICE_API_BASE_URL=https://api.groq.com/openai/v1"
+set "VOICE_API_KEY=%GROQ_API_KEY%"
+set "VOICE_STT_MODEL=whisper-large-v3-turbo"
+:ohnediktat
 set "SERVER_PORT=%PORT%"
 set "HOST=127.0.0.1"
 powershell -NoProfile -Command "Start-Process -FilePath cmd.exe -ArgumentList '/c','npm run server' -WorkingDirectory '%QUELLE%' -WindowStyle Hidden"

@@ -36,6 +36,25 @@ function applyBypassPermissions() {
 }
 
 /**
+ * Turns dictation on for this profile.
+ *
+ * A profile that predates the default carries `voiceEnabled: false` written
+ * out explicitly - the defaults land in localStorage the moment any other
+ * preference is touched - and then the mic never appears no matter what the
+ * default says. A launcher can set it straight.
+ */
+function applyVoiceEnabled(enabled) {
+  let preferences = {};
+  try {
+    preferences = JSON.parse(localStorage.getItem('uiPreferences') || '{}') || {};
+  } catch {
+    preferences = {};
+  }
+
+  localStorage.setItem('uiPreferences', JSON.stringify({ ...preferences, voiceEnabled: enabled }));
+}
+
+/**
  * Provider, model and reasoning effort, in the keys the chat itself writes.
  *
  * Taken from `useChatProviderState`, not invented here: the provider lives in
@@ -75,6 +94,7 @@ export function applyUrlHandover() {
     const provider = startUrl.searchParams.get('provider');
     const model = startUrl.searchParams.get('model');
     const effort = startUrl.searchParams.get('effort');
+    const voice = startUrl.searchParams.get('voice');
 
     if (token) {
       localStorage.setItem('auth-token', token);
@@ -95,7 +115,12 @@ export function applyUrlHandover() {
       }
     }
 
-    if (token || bypass !== null || provider || model || effort) {
+    if (voice !== null) {
+      applyVoiceEnabled(voice === '1' || voice === 'true');
+      startUrl.searchParams.delete('voice');
+    }
+
+    if (token || bypass !== null || provider || model || effort || voice !== null) {
       window.history.replaceState({}, '', `${startUrl.pathname}${startUrl.search}${startUrl.hash}`);
     }
   } catch (error) {
