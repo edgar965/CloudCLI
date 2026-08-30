@@ -659,36 +659,13 @@ export function useProjectsState({
     }
   }, [isLoadingProjects, projects, selectedProject, sessionId, projectPath]);
 
-  /** URL project path that is fully handled — project picked and session resumed. */
+  /** URL project path that is already handled — the project is selected. */
   const projectPathAppliedRef = useRef<string | null>(null);
-  /** URL project path whose project is already selected, session still pending. */
-  const projectPathSelectedRef = useRef<string | null>(null);
   /** URL project path a create attempt already ran for — one try, never a loop. */
   const projectPathCreatedRef = useRef<string | null>(null);
 
-  /**
-   * Most recently touched session of a project, or null when it has none.
-   * The list arrives sorted, but the timestamps decide - a page loaded later
-   * can be appended out of order.
-   */
-  const latestSession = (project: Project): ProjectSession | null => {
-    const sessions = Array.isArray(project.sessions) ? project.sessions : [];
-    if (sessions.length === 0) {
-      return null;
-    }
-
-    const touchedAt = (session: ProjectSession): number => {
-      const raw = session.updated_at || session.lastActivity || session.created_at || session.createdAt;
-      const parsed = raw ? Date.parse(String(raw)) : Number.NaN;
-      return Number.isNaN(parsed) ? 0 : parsed;
-    };
-
-    return [...sessions].sort((a, b) => touchedAt(b) - touchedAt(a))[0] ?? null;
-  };
-
   useEffect(() => {
     projectPathAppliedRef.current = null;
-    projectPathSelectedRef.current = null;
     projectPathCreatedRef.current = null;
   }, [projectPath]);
 
@@ -743,30 +720,13 @@ export function useProjectsState({
       return;
     }
 
-    if (projectPathSelectedRef.current !== projectPath) {
-      setSelectedProject(match);
-      projectPathSelectedRef.current = projectPath;
-    }
-
-    // Continue where the project was left off instead of opening the new
-    // session page. `replace` keeps the /project url out of the history, so
-    // going back does not land on it and select everything again.
-    const resume = latestSession(match);
-    if (resume) {
-      projectPathAppliedRef.current = projectPath;
-      setSelectedSession(resume);
-      navigate(`/session/${resume.id}`, { replace: true });
-      return;
-    }
-
-    // No session in hand. Only give up once the project is known to have
-    // none - the first list can arrive before its sessions do, and marking
-    // this done right away is what left the window on the new-session page.
-    if (Number(match.sessionMeta?.total ?? 0) === 0) {
-      projectPathAppliedRef.current = projectPath;
-      setSelectedSession(null);
-    }
-  }, [projectPath, projects, isLoadingProjects, navigate, refreshProjectsSilently]);
+    // Select the project and stay on its new-session page. Opening a launcher
+    // is how a conversation is started, so the provider and model choice has to
+    // be what shows up; pulling in the last transcript would bury it.
+    setSelectedProject(match);
+    setSelectedSession(null);
+    projectPathAppliedRef.current = projectPath;
+  }, [projectPath, projects, isLoadingProjects, refreshProjectsSilently]);
 
   // Realtime sidebar updates. The backend pushes per-session deltas
   // (`session_upserted`) instead of full project snapshots, so each event is
