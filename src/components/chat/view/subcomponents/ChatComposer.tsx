@@ -81,7 +81,6 @@ interface ChatComposerProps {
   modelsLoading: boolean;
   tokenBudget: Record<string, unknown> | null;
   onShowTokenUsage: () => void;
-  slashCommandsCount: number;
   onToggleCommandMenu: () => void;
   hasInput: boolean;
   onClearInput: () => void;
@@ -145,7 +144,6 @@ export default function ChatComposer({
   modelsLoading,
   tokenBudget,
   onShowTokenUsage,
-  slashCommandsCount,
   onToggleCommandMenu,
   hasInput,
   onClearInput,
@@ -434,7 +432,7 @@ export default function ChatComposer({
         </PromptInputBody>
 
         <PromptInputFooter>
-          <PromptInputTools className="min-w-0">
+          <PromptInputTools className="shrink-0">
             <PromptInputButton
               tooltip={{ content: t('input.attachFiles') }}
               onClick={openAttachmentPicker}
@@ -460,16 +458,8 @@ export default function ChatComposer({
             <PromptInputButton
               tooltip={{ content: t('input.showAllCommands') }}
               onClick={onToggleCommandMenu}
-              className="relative"
             >
               <MessageSquareIcon />
-              {slashCommandsCount > 0 && (
-                <span
-                  className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground"
-                >
-                  {slashCommandsCount}
-                </span>
-              )}
             </PromptInputButton>
 
             {hasInput && (
@@ -484,9 +474,9 @@ export default function ChatComposer({
 
           </PromptInputTools>
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
             <div
-              className={`hidden text-xs text-muted-foreground/50 transition-opacity duration-200 lg:block ${
+              className={`hidden min-w-0 truncate text-xs text-muted-foreground/50 transition-opacity duration-200 lg:block ${
                 input.trim() && !canQueueDraft ? 'opacity-0' : 'opacity-100'
               }`}
             >
