@@ -102,6 +102,23 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
+/**
+ * How long a login lasts, from `CLOUDCLI_TOKEN_TTL`.
+ *
+ * The default is no expiry at all: this server binds to 127.0.0.1 and serves
+ * one person on their own machine, where being logged out on a schedule buys
+ * no security worth the interruption - and every desktop profile pays it
+ * separately. A token without `exp` never lapses; `jwt.verify` then checks
+ * the signature alone.
+ *
+ * Set a real value (`7d`, `12h`, anything `jsonwebtoken` takes) when the
+ * server is reachable beyond this machine - "Allow LAN Access to Local
+ * Server" in the desktop menu does exactly that.
+ */
+const TOKEN_TTL_RAW = (process.env.CLOUDCLI_TOKEN_TTL ?? '').trim();
+const TOKEN_NEVER_EXPIRES = ['', '0', 'unbegrenzt', 'nie', 'never', 'none', 'infinite']
+  .includes(TOKEN_TTL_RAW.toLowerCase());
+
 // Generate JWT token
 const generateToken = (user) => {
   return jwt.sign(
@@ -110,7 +127,7 @@ const generateToken = (user) => {
       username: user.username
     },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    TOKEN_NEVER_EXPIRES ? {} : { expiresIn: TOKEN_TTL_RAW }
   );
 };
 
