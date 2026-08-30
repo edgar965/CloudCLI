@@ -30,7 +30,7 @@ import type {
 } from '../types/types';
 import type { Project, ProjectSession, LLMProvider, ProviderModelOption } from '../../../types/app';
 import { escapeRegExp } from '../utils/chatFormatting';
-import { openChromeTab } from '../utils/chromeTab';
+import { openChromeTab, reportChromeTab } from '../utils/chromeTab';
 
 import { useFileMentions } from './useFileMentions';
 import { type SlashCommand, useSlashCommands } from './useSlashCommands';
@@ -417,13 +417,7 @@ export function useChatComposerState({
         const url = (match?.[1] ?? '').trim();
         setInput('');
         inputValueRef.current = '';
-        void openChromeTab(url).catch((error: unknown) => {
-          addMessage({
-            type: 'assistant',
-            content: error instanceof Error ? error.message : String(error),
-            timestamp: Date.now(),
-          });
-        });
+        void reportChromeTab(openChromeTab(url), addMessage);
         return;
       }
 
@@ -812,7 +806,7 @@ export function useChatComposerState({
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
         }
-        void openChromeTab(url);
+        void reportChromeTab(openChromeTab(url), addMessage);
         return;
       }
 
