@@ -1,17 +1,14 @@
 ---
 description: Öffnet sofort einen Tab im laufenden Chrome (optional mit Adresse)
 argument-hint: "[adresse]"
-allowed-tools: mcp__chrome-tabs__tabs_context_mcp, mcp__chrome-tabs__tabs_create_mcp, mcp__chrome-tabs__navigate, mcp__chrome-tabs__list_connected_browsers
+allowed-tools: mcp__chrome-tabs__tabs_context_mcp, mcp__chrome-tabs__navigate
 ---
 
-Tab öffnen, sofort. Kein Vorwort, keine Rückfrage, keine Zwischenmeldung.
+In CloudCLI kommt dieser Text nie an: die Oberfläche fängt `/browser` ab und ruft
+`POST /api/chrome-tabs/tab` auf, ohne Modell. Das hier gilt nur im Terminal.
 
-1. `mcp__chrome-tabs__tabs_context_mcp` mit `createIfEmpty: true`.
-2. `$ARGUMENTS` leer → `mcp__chrome-tabs__tabs_create_mcp`.
-   Sonst → `mcp__chrome-tabs__navigate` mit `url: $ARGUMENTS` und der `tabId` des letzten
-   Tabs aus Schritt 1 (ohne `tabId`: „No tab available").
-3. Eine Zeile melden: Adresse und `tabId`. Den Seiteninhalt nicht lesen und nicht
-   zusammenfassen.
+`$ARGUMENTS` leer → `mcp__chrome-tabs__tabs_context_mcp` mit `createIfEmpty: true`.
+Sonst zusätzlich `mcp__chrome-tabs__navigate` mit `url: $ARGUMENTS` und der `tabId` des
+letzten Tabs daraus.
 
-Keine Antwort? Chrome läuft nicht oder die Erweiterung ist nicht verbunden —
-`mcp__chrome-tabs__list_connected_browsers` zeigt es.
+Keine Textantwort, keine Zusammenfassung.

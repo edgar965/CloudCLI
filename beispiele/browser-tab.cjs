@@ -136,20 +136,25 @@ function antworttext(ergebnis) {
   // Pflicht vor allen anderen Browser-Werkzeugen: die Tab-Gruppe holen.
   // createIfEmpty legt sie an, wenn es noch keine gibt - das ist der Moment,
   // in dem das Fenster aufgeht.
+  //
+  // Die VS-Code-Erweiterung macht fuer "@browser:newTab" NUR diesen einen
+  // Aufruf (extension.js, createNewBrowserTab). Das reicht dort, weil jede
+  // Sitzung ihre eigene Gruppe bekommt. Existiert die Gruppe schon, hat
+  // createIfEmpty laut Schema "keine Wirkung" - dann braucht es
+  // tabs_create_mcp fuer einen wirklich neuen Tab.
   const kontext = await rufen('tools/call', {
     name: 'tabs_context_mcp',
     arguments: { createIfEmpty: true },
   });
   let gruppe = gruppendaten(kontext);
-  console.log(`Tab-Gruppe ${gruppe.tabGroupId ?? "?"} mit ${gruppe.availableTabs.length} Tab(s).`);
 
-  // Ohne tabId findet navigate den frisch angelegten Tab nicht ("No tab
-  // available") - die ID kommt aus der Kontextantwort.
   if (!ZIEL) {
-    const angelegt = await rufen('tools/call', { name: 'tabs_create_mcp', arguments: {} });
-    gruppe = gruppendaten(angelegt) ?? gruppe;
-    const letzter = gruppe.availableTabs[gruppe.availableTabs.length - 1];
-    console.log(`Neuer Tab${letzter ? ` (tabId ${letzter.tabId})` : ""}.`);
+    const vorher = new Set(gruppe.availableTabs.map((tab) => tab.tabId));
+    await rufen('tools/call', { name: 'tabs_create_mcp', arguments: {} });
+    // tabs_create_mcp meldet die neue ID nicht zurueck - der Kontext schon.
+    gruppe = gruppendaten(await rufen('tools/call', { name: 'tabs_context_mcp', arguments: {} }));
+    const neu = gruppe.availableTabs.find((tab) => !vorher.has(tab.tabId));
+    console.log(`Leerer Tab offen${neu ? ` (tabId ${neu.tabId})` : ""}.`);
     server.kill();
     process.exit(0);
   }
