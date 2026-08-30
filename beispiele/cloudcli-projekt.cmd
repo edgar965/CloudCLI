@@ -4,7 +4,7 @@ rem CloudCLI fuer EIN Projektverzeichnis oeffnen.
 rem
 rem   cloudcli-projekt.cmd                          aktuelles Verzeichnis
 rem   cloudcli-projekt.cmd "A:\projekt"             dieses Verzeichnis
-rem   cloudcli-projekt.cmd "A:\projekt" --bypass    ohne Rueckfragen
+rem   cloudcli-projekt.cmd "A:\projekt" --fragen    MIT Rueckfragen
 rem   cloudcli-projekt.cmd . --name arbeit          eigener Fenstername
 rem   cloudcli-projekt.cmd . --browser              statt Fenster im Browser
 rem   cloudcli-projekt.cmd . --port 3011            anderer Port
@@ -22,10 +22,16 @@ rem   Fenstertitel  Name des Verzeichnisses (oder --name)
 rem   Profil        %APPDATA%\CloudCLI-<Name>, damit mehrere Fenster
 rem                 gleichzeitig offen sein koennen
 rem
-rem --bypass schaltet die Rueckfragen vor Werkzeugaufrufen ab (dasselbe wie
-rem "Skip permissions" in den Einstellungen). Der Agent darf dann ohne
-rem Nachfrage Dateien aendern und Befehle ausfuehren. Nur fuer Verzeichnisse
-rem benutzen, bei denen das gewollt ist.
+rem RUECKFRAGEN SIND HIER VORGABEMAESSIG AUS
+rem   Das Fenster startet mit "Skip permissions": der Agent aendert Dateien
+rem   und fuehrt Befehle aus, ohne vorher zu fragen - auch MCP-Werkzeuge wie
+rem   der Chrome-Tab. Wer ein Verzeichnis oeffnet, das ihm nicht gehoert,
+rem   haengt --fragen an; dann kommt der Bestaetigungsdialog wie gehabt.
+rem   --bypass gibt es weiterhin, es ist jetzt nur noch die Vorgabe.
+rem
+rem   Technisch: die Startadresse bekommt ?bypass=1, src/startup/handover.js
+rem   setzt daraufhin skipPermissions in claude-settings, opencode-settings
+rem   und cursor-tools-settings des Profils.
 rem ============================================================
 setlocal EnableExtensions EnableDelayedExpansion
 
@@ -38,7 +44,7 @@ if not defined QUELLE for %%q in ("%HIER%..") do set "QUELLE=%%~fq"
 set "ZIEL="
 set "NAME="
 set "PORT=3010"
-set "BYPASS=0"
+set "BYPASS=1"
 set "BROWSER=0"
 set "NURADRESSE=0"
 
@@ -49,6 +55,8 @@ if /i "%~1"=="--help"         goto :hilfe
 if /i "%~1"=="-h"            goto :hilfe
 if "%~1"=="/?"               goto :hilfe
 if /i "%~1"=="--bypass"      ( set "BYPASS=1"      & shift & goto :argumente )
+if /i "%~1"=="--fragen"      ( set "BYPASS=0"      & shift & goto :argumente )
+if /i "%~1"=="--no-bypass"   ( set "BYPASS=0"      & shift & goto :argumente )
 if /i "%~1"=="--browser"     ( set "BROWSER=1"     & shift & goto :argumente )
 if /i "%~1"=="--nur-adresse" ( set "NURADRESSE=1"  & shift & goto :argumente )
 if /i "%~1"=="--name"        ( set "NAME=%~2"      & shift & shift & goto :argumente )
@@ -178,10 +186,11 @@ echo.
 echo Ohne Verzeichnis wird das aktuelle genommen.
 echo.
 echo Optionen:
-echo   --bypass          Rueckfragen vor Werkzeugaufrufen abschalten
-echo                     (wie "Skip permissions" in den Einstellungen):
-echo                     der Agent aendert Dateien und fuehrt Befehle aus,
-echo                     ohne zu fragen.
+echo   --fragen          Rueckfragen vor Werkzeugaufrufen wieder einschalten.
+echo                     Ohne diese Option laeuft das Fenster mit
+echo                     "Skip permissions": der Agent aendert Dateien und
+echo                     fuehrt Befehle aus, ohne zu fragen.
+echo   --bypass          Vorgabe, ausdruecklich gesetzt (tut nichts extra).
 echo   --name ^<name^>     Fenstername und Profil (Vorgabe: Verzeichnisname).
 echo                     Zweimal derselbe Name heisst dasselbe Profil - das
 echo                     zweite Fenster geht dann nicht auf.
@@ -196,7 +205,7 @@ echo   CLOUDCLI_TOKEN_TTL  Laufzeit des Tokens (Vorgabe: unbegrenzt)
 echo.
 echo Beispiele:
 echo   cloudcli-projekt.cmd
-echo   cloudcli-projekt.cmd "A:\projekt" --bypass
+echo   cloudcli-projekt.cmd "A:\projekt" --fragen
 echo   cloudcli-projekt.cmd . --name arbeit --port 3011
 endlocal
 exit /b 0
