@@ -1,5 +1,7 @@
 import { BrowserView } from 'electron';
 
+import { syncSharedUiToken } from './uiToken.js';
+
 const TARGET_LOAD_TIMEOUT_MS = 20000;
 
 function escapeHtml(value) {
@@ -135,7 +137,8 @@ export class ViewHost {
     return true;
   }
 
-  async readLocalStorageValueForOrigin(originUrl, key) {
+  /** First live view serving `originUrl`, or null. */
+  findViewForOrigin(originUrl) {
     let targetOrigin;
     try {
       targetOrigin = new URL(originUrl).origin;
@@ -151,8 +154,15 @@ export class ViewHost {
       } catch {
         continue;
       }
-      if (viewOrigin !== targetOrigin) continue;
+      if (viewOrigin === targetOrigin) return view;
+    }
 
+    return null;
+  }
+
+  async readLocalStorageValueForOrigin(originUrl, key) {
+    const view = this.findViewForOrigin(originUrl);
+    if (view) {
       try {
         const value = await view.webContents.executeJavaScript(
           `window.localStorage.getItem(${JSON.stringify(key)})`,
@@ -165,6 +175,26 @@ export class ViewHost {
     }
 
     return null;
+  }
+
+  /**
+   * Shares this view's login with the other desktop profiles, and reloads it
+   * when it was the one that just received a token — `localStorage` is read at
+   * startup, so the UI only notices a token that was there before the load.
+   */
+  async syncSharedUiTokenForOrigin(originUrl) {
+    const view = this.findViewForOrigin(originUrl);
+    if (!view) {
+      return;
+    }
+
+    if (await syncSharedUiToken(view.webContents)) {
+      try {
+        view.webContents.reload();
+      } catch {
+        // View disappeared mid-reload; nothing left to restore.
+      }
+    }
   }
 
   getTabViewDiagnostics() {
