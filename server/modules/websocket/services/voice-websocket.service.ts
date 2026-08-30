@@ -54,7 +54,11 @@ export function handleVoiceWebSocket(ws: WebSocket): void {
       const message = JSON.parse(raw.toString()) as { type?: string; language?: unknown };
       if (message.type === 'start') {
         const language = typeof message.language === 'string' ? message.language : 'en';
-        void startStream(language);
+        // A stream that cannot even be opened has to say so; unhandled, the
+        // page would wait for a transcript that is never coming.
+        void startStream(language).catch((error: unknown) => {
+          say({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+        });
         return;
       }
       if (message.type === 'stop') {

@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import type { PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Mic, Square, Loader2 } from 'lucide-react';
 
@@ -55,11 +56,15 @@ export default function VoiceInputButton({
       <Mic />
     );
 
-  const onPointerDown = useCallback(() => {
+  const onPointerDown = useCallback((event: PointerEvent<HTMLButtonElement>) => {
     if (!onHoldStart) {
       return;
     }
 
+    // Hold the pointer to this button, so a hand that drifts off it while
+    // speaking still delivers the release here. Without that, sliding off
+    // would cut the recording short mid-sentence.
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     pressedAt.current = Date.now();
     // Whether this press is what started the recording decides what releasing
     // it means: the end of a hold, or the second tap that stops one.
@@ -101,9 +106,10 @@ export default function VoiceInputButton({
         tooltip={{ content: state === 'recording' ? t('voice.stopRecording') : t('voice.input') }}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
-        // A pointer that leaves the button still ends the hold; without this the
-        // recording would keep running with nothing to stop it.
-        onPointerLeave={onPointerUp}
+        // A pointer the system takes away (a gesture, a lost device) ends the
+        // hold as a release would; otherwise the recording would keep running
+        // with nothing left to stop it.
+        onPointerCancel={onPointerUp}
         onClick={(e: { preventDefault: () => void }) => {
           e.preventDefault();
           // Holding already started and stopped the recording; only a plain

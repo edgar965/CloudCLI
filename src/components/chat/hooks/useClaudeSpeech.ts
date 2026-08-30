@@ -79,6 +79,17 @@ export function useClaudeSpeech(
   const transcript = useRef('');
   const sendOnEnd = useRef(false);
   const workletUrl = useRef<string | null>(null);
+  /** Set once this dictation is over, so a late message cannot repeat it. */
+  const finished = useRef(false);
+  /**
+   * Set while the microphone and the socket are being set up.
+   *
+   * `socket.current` only exists after `getUserMedia` has been awaited, so
+   * checking that alone lets a second press through in between - and that one
+   * opens its own microphone and its own connection, with nothing to stop
+   * either.
+   */
+  const starting = useRef(false);
 
   const cleanup = useCallback(() => {
     stream.current?.getTracks().forEach((track) => track.stop());
@@ -99,12 +110,14 @@ export function useClaudeSpeech(
   }, [cleanup]);
 
   const start = useCallback(async () => {
-    if (socket.current) {
+    if (socket.current || starting.current) {
       return;
     }
 
+    starting.current = true;
     transcript.current = '';
     sendOnEnd.current = false;
+    finished.current = false;
 
     try {
       const media = await navigator.mediaDevices.getUserMedia({
@@ -139,17 +152,39 @@ export function useClaudeSpeech(
       };
 
       ws.onmessage = (event) => {
-        const message = JSON.parse(String(event.data)) as { type?: string; text?: string; message?: string };
+        // Everything after the first end belongs to a dictation that is over:
+        // the transcript has been handed on, and handing it on again would put
+        // it in the box twice.
+        if (finished.current) {
+          return;
+        }
+
+        let message: { type?: string; text?: string; message?: string };
+        try {
+          message = JSON.parse(String(event.data));
+        } catch {
+          return;
+        }
+
         if (message.type === 'transcript' && typeof message.text === 'string') {
           // Each message is the full transcript, not an addition.
           transcript.current = message.text;
           return;
         }
         if (message.type === 'error') {
+          // Nothing more is coming, so the microphone and the button have to be
+          // let go here - otherwise the button keeps spinning with no end in
+          // sight, which is what a missing login used to look like.
+          finished.current = true;
+          cleanup();
+          socket.current?.close();
+          socket.current = null;
+          setState('idle');
           onError?.(message.message || 'Dictation failed.');
           return;
         }
         if (message.type === 'end') {
+          finished.current = true;
           const text = transcript.current.trim();
           if (text) {
             onTranscript(text, sendOnEnd.current);
@@ -165,6 +200,9 @@ export function useClaudeSpeech(
 
       ws.onerror = () => onError?.('The dictation connection failed.');
       ws.onclose = () => {
+        // A connection that drops mid-recording would otherwise leave the
+        // microphone running with nothing listening to it.
+        cleanup();
         socket.current = null;
         setState((current) => (current === 'idle' ? current : 'idle'));
       };
@@ -186,8 +224,10 @@ export function useClaudeSpeech(
       silence.gain.value = 0;
       chunker.connect(silence).connect(audio.destination);
 
+      starting.current = false;
       setState('recording');
     } catch (error) {
+      starting.current = false;
       cleanup();
       socket.current?.close();
       socket.current = null;

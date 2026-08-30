@@ -33,6 +33,8 @@ import WebSocket from 'ws';
  */
 
 const STREAM_PATH = '/api/ws/speech_to_text/voice_stream';
+/** Ceiling for audio held while connecting - about five minutes at 16 kHz mono. */
+const MAX_QUEUED_BYTES = 10 * 1024 * 1024;
 const DEFAULT_API_BASE = 'https://api.anthropic.com';
 
 export type SpeechCredentials = { accessToken: string };
@@ -89,14 +91,44 @@ export class ClaudeSpeechStream {
    */
   private queued: Buffer[] = [];
 
+  /**
+   * How much audio is held, in bytes. Counting chunks says nothing about size -
+   * the page decides how big a frame is, and 300 large ones would be hundreds
+   * of megabytes in this process.
+   */
+  private queuedBytes = 0;
+
   /** A `stop` that arrived while the stream was still opening. */
   private finishQueued = false;
 
+  /**
+   * Whether the end has already been reported.
+   *
+   * It is announced twice: `TranscriptEndpoint` arrives, and the upstream
+   * closes right after. Measured against a spoken sentence, 28 ms apart -
+   * close enough to reach the page in one turn, which would have inserted the
+   * transcript twice, or sent it twice when the button was held.
+   */
+  private ended = false;
+
   constructor(private readonly events: SpeechEvents) {}
+
+  /** The end is reported once, whichever of the two says so first. */
+  private emitEnd(): void {
+    if (this.ended) {
+      return;
+    }
+
+    this.ended = true;
+    this.events.onEnd();
+  }
 
   async open(language: string): Promise<void> {
     const token = await readClaudeToken();
     if (!token) {
+      // Nothing will come of this stream, so it must not go on collecting the
+      // audio the page keeps sending until someone closes it.
+      this.closing = true;
       this.events.onError('No Claude credentials. Run "claude /login" once.');
       return;
     }
@@ -105,6 +137,15 @@ export class ClaudeSpeechStream {
       .replace(/^https:\/\//, 'wss://')
       .replace(/^http:\/\//, 'ws://')
       .replace(/\/$/, '');
+
+    // The credentials travel in an Authorization header. Plain ws:// is only
+    // allowed to reach this machine - a stand-in during development - never a
+    // host on the network, where the token would go across in the clear.
+    if (base.startsWith('ws://') && !/^ws:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|$|\/)/.test(base)) {
+      this.closing = true;
+      this.events.onError('VOICE_STREAM_BASE_URL must use https for anything but localhost.');
+      return;
+    }
 
     const params = new URLSearchParams({
       encoding: 'linear16',
@@ -131,6 +172,7 @@ export class ClaudeSpeechStream {
         socket.send(chunk);
       }
       this.queued = [];
+      this.queuedBytes = 0;
       if (this.finishQueued) {
         this.finishQueued = false;
         socket.send('{"type":"CloseStream"}');
@@ -141,7 +183,7 @@ export class ClaudeSpeechStream {
     socket.on('close', () => {
       this.upstream = null;
       if (!this.closing) {
-        this.events.onEnd();
+        this.emitEnd();
       }
     });
 
@@ -156,7 +198,7 @@ export class ClaudeSpeechStream {
         return;
       }
       if (message.type === 'TranscriptEndpoint') {
-        this.events.onEnd();
+        this.emitEnd();
       }
     } catch {
       // Anything that is not json is not ours to interpret.
@@ -170,10 +212,12 @@ export class ClaudeSpeechStream {
       return;
     }
 
-    // Still connecting - hold it rather than lose the opening words. Capped so
-    // an upstream that never opens cannot grow without end (~30 s of audio).
-    if (!this.closing && this.queued.length < 300) {
+    // Still connecting - hold it rather than lose the opening words. Capped in
+    // bytes so an upstream that never opens cannot grow without end; 10 MB is
+    // around five minutes of the 16 kHz mono the stream takes.
+    if (!this.closing && this.queuedBytes + chunk.length <= MAX_QUEUED_BYTES) {
       this.queued.push(chunk);
+      this.queuedBytes += chunk.length;
     }
   }
 
@@ -190,6 +234,8 @@ export class ClaudeSpeechStream {
 
   close(): void {
     this.closing = true;
+    this.queued = [];
+    this.queuedBytes = 0;
     this.upstream?.close();
     this.upstream = null;
   }

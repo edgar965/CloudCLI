@@ -48,7 +48,14 @@ const DEFAULTS: UiPreferences = {
 const PREFERENCE_KEYS = Object.keys(DEFAULTS) as UiPreferenceKey[];
 const VALID_KEYS = new Set<UiPreferenceKey>(PREFERENCE_KEYS); // prevents unknown keys from being written
 const SYNC_EVENT = 'ui-preferences:sync';
-/** Marks that the one-time lift of `voiceEnabled` has already happened. */
+/**
+ * Marks that the one-time lift of `voiceEnabled` has already happened.
+ *
+ * It lives in a key of its own rather than inside the preferences: that entry
+ * is rewritten from state on every change, and a marker kept in there would be
+ * dropped by the next write - so switching dictation off would be undone again
+ * on the following reload.
+ */
 const VOICE_DEFAULT_APPLIED = 'voiceEnabledDefaultApplied';
 
 type SyncEventDetail = {
@@ -106,14 +113,11 @@ const readInitialPreferences = (storageKey: string): UiPreferences => {
         // default that got saved the first time any other preference was
         // touched. Lift it once, and remember having done so, so switching
         // dictation off afterwards sticks.
-        if (!preferences.voiceEnabled && parsedRecord[VOICE_DEFAULT_APPLIED] !== true) {
+        if (!preferences.voiceEnabled && localStorage.getItem(VOICE_DEFAULT_APPLIED) !== 'true') {
           preferences.voiceEnabled = true;
           try {
-            localStorage.setItem(storageKey, JSON.stringify({
-              ...parsedRecord,
-              voiceEnabled: true,
-              [VOICE_DEFAULT_APPLIED]: true,
-            }));
+            localStorage.setItem(VOICE_DEFAULT_APPLIED, 'true');
+            localStorage.setItem(storageKey, JSON.stringify({ ...parsedRecord, voiceEnabled: true }));
           } catch {
             // Storage refused it; the value still holds for this session.
           }
