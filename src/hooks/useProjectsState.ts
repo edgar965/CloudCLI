@@ -15,6 +15,11 @@ import type { SessionActivityMap } from './useSessionProtection';
 
 type UseProjectsStateArgs = {
   sessionId?: string;
+  /**
+   * Project path from the `/project/:projectPath` route, still URL-encoded.
+   * Selects that project once, as soon as the project list has loaded.
+   */
+  projectPath?: string;
   navigate: NavigateFunction;
   /** Subscription to the unified websocket event stream. */
   subscribe: (listener: (event: ServerEvent) => void) => () => void;
@@ -373,6 +378,7 @@ const readPersistedTab = (): AppTab => {
 
 export function useProjectsState({
   sessionId,
+  projectPath,
   navigate,
   subscribe,
   isMobile,
@@ -648,10 +654,119 @@ export function useProjectsState({
 
   // Auto-select the project when there is only one, so the user lands on the new session page
   useEffect(() => {
-    if (!isLoadingProjects && projects.length === 1 && !selectedProject && !sessionId) {
+    if (!isLoadingProjects && projects.length === 1 && !selectedProject && !sessionId && !projectPath) {
       setSelectedProject(projects[0]);
     }
-  }, [isLoadingProjects, projects, selectedProject, sessionId]);
+  }, [isLoadingProjects, projects, selectedProject, sessionId, projectPath]);
+
+  /** URL project path that is fully handled — project picked and session resumed. */
+  const projectPathAppliedRef = useRef<string | null>(null);
+  /** URL project path whose project is already selected, session still pending. */
+  const projectPathSelectedRef = useRef<string | null>(null);
+  /** URL project path a create attempt already ran for — one try, never a loop. */
+  const projectPathCreatedRef = useRef<string | null>(null);
+
+  /**
+   * Most recently touched session of a project, or null when it has none.
+   * The list arrives sorted, but the timestamps decide - a page loaded later
+   * can be appended out of order.
+   */
+  const latestSession = (project: Project): ProjectSession | null => {
+    const sessions = Array.isArray(project.sessions) ? project.sessions : [];
+    if (sessions.length === 0) {
+      return null;
+    }
+
+    const touchedAt = (session: ProjectSession): number => {
+      const raw = session.updated_at || session.lastActivity || session.created_at || session.createdAt;
+      const parsed = raw ? Date.parse(String(raw)) : Number.NaN;
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+
+    return [...sessions].sort((a, b) => touchedAt(b) - touchedAt(a))[0] ?? null;
+  };
+
+  useEffect(() => {
+    projectPathAppliedRef.current = null;
+    projectPathSelectedRef.current = null;
+    projectPathCreatedRef.current = null;
+  }, [projectPath]);
+
+  // `/project/:projectPath` — select that project once the list has arrived.
+  // Applied a single time per url so the user can navigate away afterwards
+  // without being pulled back. The comparison falls back to a case-insensitive
+  // match because Windows treats `a:\work` and `A:\work` as one directory.
+  useEffect(() => {
+    if (!projectPath || isLoadingProjects || projects.length === 0) {
+      return;
+    }
+
+    if (projectPathAppliedRef.current === projectPath) {
+      return;
+    }
+
+    let wantedPath: string;
+    try {
+      wantedPath = decodeURIComponent(projectPath);
+    } catch {
+      wantedPath = projectPath;
+    }
+
+    const match = projects.find((project) => {
+      const candidate = String(project.fullPath || project.path || '');
+      return candidate === wantedPath || candidate.toLowerCase() === wantedPath.toLowerCase();
+    });
+
+    if (!match) {
+      // A directory that has never been opened here has no row in `projects`
+      // yet. Create it once, then let the refreshed list run this again -
+      // otherwise a launcher pointed at such a folder would open nothing.
+      if (projectPathCreatedRef.current === projectPath) {
+        console.warn('No project matches the path from the url:', wantedPath);
+        projectPathAppliedRef.current = projectPath;
+        return;
+      }
+
+      projectPathCreatedRef.current = projectPath;
+      void (async () => {
+        try {
+          const response = await api.createProject({ path: wantedPath });
+          if (!response.ok) {
+            console.warn('Could not create a project for', wantedPath, await response.text());
+            return;
+          }
+          await refreshProjectsSilently();
+        } catch (error) {
+          console.warn('Could not create a project for', wantedPath, error);
+        }
+      })();
+      return;
+    }
+
+    if (projectPathSelectedRef.current !== projectPath) {
+      setSelectedProject(match);
+      projectPathSelectedRef.current = projectPath;
+    }
+
+    // Continue where the project was left off instead of opening the new
+    // session page. `replace` keeps the /project url out of the history, so
+    // going back does not land on it and select everything again.
+    const resume = latestSession(match);
+    if (resume) {
+      projectPathAppliedRef.current = projectPath;
+      setSelectedSession(resume);
+      navigate(`/session/${resume.id}`, { replace: true });
+      return;
+    }
+
+    // No session in hand. Only give up once the project is known to have
+    // none - the first list can arrive before its sessions do, and marking
+    // this done right away is what left the window on the new-session page.
+    if (Number(match.sessionMeta?.total ?? 0) === 0) {
+      projectPathAppliedRef.current = projectPath;
+      setSelectedSession(null);
+    }
+  }, [projectPath, projects, isLoadingProjects, navigate, refreshProjectsSilently]);
 
   // Realtime sidebar updates. The backend pushes per-session deltas
   // (`session_upserted`) instead of full project snapshots, so each event is

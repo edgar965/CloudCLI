@@ -50,7 +50,7 @@ export default function AppContent() {
 
 function AppContentInner() {
   const navigate = useNavigate();
-  const { sessionId } = useParams<{ sessionId?: string }>();
+  const { sessionId, projectPath } = useParams<{ sessionId?: string; projectPath?: string }>();
   const { t } = useTranslation('common');
   const { isMobile } = useDeviceSettings({ trackPWA: false });
   const { ws, sendMessage, subscribe } = useWebSocket();
@@ -81,6 +81,7 @@ function AppContentInner() {
     handleProjectSelect,
   } = useProjectsState({
     sessionId,
+    projectPath,
     navigate,
     subscribe,
     isMobile,

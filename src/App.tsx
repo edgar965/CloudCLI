@@ -116,6 +116,14 @@ export default function App() {
                     <Routes>
                       <Route path="/" element={<AppContent />} />
                       <Route path="/session/:sessionId" element={<AppContent />} />
+                      {/*
+                        Open one project straight from a URL, addressed by its
+                        path: /project/A%3A%5Cshortlongx. Lets a launcher point
+                        a window at a directory without knowing any id - the
+                        path is what the user has, the project id is a uuid
+                        that only exists in the database.
+                      */}
+                      <Route path="/project/:projectPath" element={<AppContent />} />
                     </Routes>
                   </Router>
                 </ProtectedRoute>
