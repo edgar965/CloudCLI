@@ -1,6 +1,7 @@
 ---
 description: Öffnet sofort einen Tab im laufenden Chrome (optional mit Adresse) — das Gegenstück zu @browser:newTab in VS Code
 argument-hint: "[adresse]"
+allowed-tools: mcp__chrome-tabs__tabs_context_mcp, mcp__chrome-tabs__tabs_create_mcp, mcp__chrome-tabs__navigate, mcp__chrome-tabs__list_connected_browsers
 ---
 
 # /browser — Tab im echten Chrome öffnen
