@@ -1,33 +1,34 @@
-# CloudCLI — Fork von siteboon/claudecodeui
+# CloudCLI — a fork of siteboon/claudecodeui
 
-Weboberfläche für Claude Code, OpenCode, Cursor und Codex. Dieser Fork
-(`edgar965/CloudCLI`) läuft unter Windows auf Laufwerk `A:` und startet je
-Projektverzeichnis ein eigenes Fenster.
+*[Deutsche Fassung](README.de.md)*
 
-**➡️ Installation, Start und Startdateien: [LOKALE-NUTZUNG.md](LOKALE-NUTZUNG.md)**
+Web interface for Claude Code, OpenCode, Cursor and Codex. This fork
+(`edgar965/CloudCLI`) runs on Windows with projects on drive `A:`, and opens one
+window per project directory.
 
-Die Dokumentation des Ursprungsprojekts liegt unter
-[docs/README.md](docs/README.md).
+**➡️ Install, start and launchers: [HOWTO.md](HOWTO.md)**
 
-## Was hier anders ist
+The upstream documentation lives in [docs/README.md](docs/README.md).
 
-| Änderung | Wirkung |
+## What is different here
+
+| Change | Effect |
 |---|---|
-| Laufwerksbuchstabe | `a:\projekt` und `A:\projekt` sind ein Projekt, nicht zwei |
-| `WORKSPACES_ROOT=A:\` | Ein Laufwerk als Arbeitswurzel wird akzeptiert |
-| Route `/project/<pfad>` | Startadresse wählt ein Projekt aus, und legt es an, wenn es unbekannt ist |
-| `?token=` und `?bypass=` | Anmeldung und „Skip permissions" aus einer Startdatei |
-| `CLOUDCLI_INSTANCE_NAME` | Name im Fenstertitel, für mehrere Fenster nebeneinander |
-| Modelle aus der OpenCode-Konfiguration | Lokales Ollama, OpenRouter usw. erscheinen im Modell-Menü |
-| Zuklappbare Äste im Modell-Menü | 90+ OpenCode-Modelle lassen sich einklappen |
+| Drive letter case | `a:\project` and `A:\project` are one project, not two |
+| `WORKSPACES_ROOT=A:\` | A drive root is accepted as the workspace root |
+| Route `/project/<path>` | The start address selects a project, and creates it when the directory is new |
+| `?token=` and `?bypass=` | Login and "skip permissions" handed over by a launcher |
+| `CLOUDCLI_INSTANCE_NAME` | Names the window, so several can run side by side |
+| Models from the OpenCode config | A local Ollama, OpenRouter and the like show up in the model picker |
+| Collapsible branches in the model picker | The 90+ OpenCode models can be folded away |
 
-Vier dieser Punkte liegen als Pull Request beim Ursprungsprojekt:
+Four of these are open pull requests upstream:
 [#1226](https://github.com/siteboon/claudecodeui/pull/1226),
 [#1227](https://github.com/siteboon/claudecodeui/pull/1227),
 [#1228](https://github.com/siteboon/claudecodeui/pull/1228),
 [#1229](https://github.com/siteboon/claudecodeui/pull/1229).
 
-## Schnellstart
+## Quick start
 
 ```bash
 git clone https://github.com/edgar965/CloudCLI.git
@@ -37,11 +38,11 @@ npm run build
 set SERVER_PORT=3010 && npm run server
 ```
 
-Dann `http://127.0.0.1:3010/` öffnen, einmal anmelden — danach startet
+Open `http://127.0.0.1:3010/` and create a user once. After that
 
 ```
-beispiele\cloudcli-projekt.cmd "A:\projekt" --bypass
+beispiele\cloudcli-projekt.cmd "A:\project" --bypass
 ```
 
-ein eigenes Fenster für dieses Verzeichnis, ohne Login und ohne Rückfragen vor
-Werkzeugaufrufen. `beispiele\cloudcli-projekt.cmd help` zeigt alle Optionen.
+opens a window of its own for that directory, without a login and without
+permission prompts. `beispiele\cloudcli-projekt.cmd help` lists every option.
