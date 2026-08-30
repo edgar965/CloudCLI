@@ -408,8 +408,13 @@ export function useChatComposerState({
       // "/browser" never becomes a prompt, whichever way it was reached - typed
       // and submitted, or picked from the command menu, which lands here.
       if (command.name === '/browser') {
+        // Cut at the command name, never at the literal "/browser": picking the
+        // command from the menu after typing "/bro" leaves the input at "/bro",
+        // and stripping a prefix that is not there left the whole thing as the
+        // address - Chrome then asked to navigate to "bro".
         const typed = rawInput ?? input;
-        const url = typed.replace(/^\s*\/browser\s*/i, '').trim();
+        const match = typed.match(new RegExp(`${escapeRegExp(command.name)}\\s*(.*)`));
+        const url = (match?.[1] ?? '').trim();
         setInput('');
         inputValueRef.current = '';
         void openChromeTab(url).catch((error: unknown) => {

@@ -64,6 +64,17 @@ export const chromeTabsService = {
   async openTab(rawUrl?: string): Promise<OpenTabResult> {
     const url = (rawUrl ?? '').trim();
 
+    // A bare word is not an address, and the Chrome extension asks the user
+    // before every navigation - so a stray fragment of the command itself
+    // ("bro", left over from picking /browser after typing /bro) turned into a
+    // permission prompt for a site that does not exist. Refuse it here instead.
+    if (url && !/^[a-z][a-z0-9+.-]*:\/\//i.test(url) && !/^[^\s/]+\.[^\s/]{2,}/.test(url)) {
+      throw new AppError(`"${url}" is not an address.`, {
+        code: 'INVALID_URL',
+        statusCode: 400,
+      });
+    }
+
     // Look before creating. There are two ways a tab comes into being here,
     // and running both is how one click produced two tabs: `createIfEmpty`
     // opens a window with an empty tab when no group exists yet, and
