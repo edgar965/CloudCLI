@@ -320,6 +320,43 @@ curl -s -X DELETE -H "Authorization: Bearer $TOKEN" $BASE/sessions/<id>
 curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/runtime/install
 ```
 
+
+### The shorter way: the Chrome that is already running
+
+Visual Studio Code opens a tab instantly with `@browser:newTab`, with nothing to install.
+That is because the extension starts no browser at all: it runs **Claude Code itself** as an
+MCP server — `claude --claude-in-chrome-mcp` over stdio — which talks to the Claude
+extension in the running Chrome. You are logged in wherever you already were.
+
+The same server can be registered for CloudCLI. Once:
+
+```bash
+claude mcp add chrome-tabs --scope user -e USER_TYPE=external -- claude --claude-in-chrome-mcp
+claude mcp list        # chrome-tabs: ... - Connected
+```
+
+(The name `claude-in-chrome` is reserved, hence `chrome-tabs`.) The agent then has 22 tools:
+`navigate`, `tabs_create_mcp`, `read_page`, `find`, `form_input`, `read_console_messages`,
+`read_network_requests` and more.
+
+Plus a slash command CloudCLI offers in every project — copy `beispiele/browser.md` to
+`~/.claude/commands/browser.md`, then:
+
+```
+/browser                 empty tab
+/browser example.com     tab at that address
+```
+
+Without the interface, straight from a shell:
+
+```bash
+node beispiele/browser-tab.cjs example.com
+```
+
+The very first call waits for Chrome to confirm the connection; after that the server
+answers immediately. If nothing comes back, Chrome is not running or the extension is not
+connected — `list_connected_browsers` shows which browsers are attached.
+
 ## 11. Environment variables
 
 | Variable | Effect |

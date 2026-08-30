@@ -332,6 +332,44 @@ curl -s -X DELETE -H "Authorization: Bearer $TOKEN" $BASE/sessions/<id>
 curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/runtime/install
 ```
 
+
+### Der kürzere Weg: der Chrome, der schon läuft
+
+Visual Studio Code öffnet mit `@browser:newTab` sofort einen Tab, ohne dass irgendetwas
+installiert werden müsste. Das liegt daran, dass die Erweiterung gar keinen Browser startet:
+Sie ruft **Claude Code selbst** als MCP-Server auf —
+`claude --claude-in-chrome-mcp` über stdio — und der redet mit der Claude-Erweiterung im
+laufenden Chrome. Angemeldet ist man dort, wo man ohnehin angemeldet ist.
+
+Derselbe Server lässt sich in CloudCLI eintragen. Einmalig:
+
+```bash
+claude mcp add chrome-tabs --scope user -e USER_TYPE=external -- claude --claude-in-chrome-mcp
+claude mcp list        # chrome-tabs: ... - Connected
+```
+
+(Der Name `claude-in-chrome` ist reserviert, deshalb `chrome-tabs`.) Danach hat der Agent
+22 Werkzeuge: `navigate`, `tabs_create_mcp`, `read_page`, `find`, `form_input`,
+`read_console_messages`, `read_network_requests` und weitere.
+
+Dazu ein Slash-Kommando, das CloudCLI in jedem Projekt anbietet — `beispiele/browser.md`
+nach `~/.claude/commands/browser.md` kopieren, dann:
+
+```
+/browser                 leerer Tab
+/browser example.com     Tab mit Adresse
+```
+
+Ohne Oberfläche geht es auch direkt:
+
+```bash
+node beispiele/browser-tab.cjs example.com
+```
+
+Beim allerersten Aufruf dauert es, bis Chrome die Verbindung bestätigt hat; danach
+antwortet der Server sofort. Meldet er nichts, läuft Chrome nicht oder die Erweiterung
+ist nicht verbunden — `list_connected_browsers` zeigt es.
+
 ## 11. Umgebungsvariablen
 
 | Variable | Wirkung |
