@@ -198,11 +198,25 @@ function AppContentInner() {
       // Do NOT listen to scroll: on iOS Safari, scrolling content changes
       // vv.offsetTop which would make --keyboard-height fluctuate during
       // normal scrolling, causing the container to bounce up and down.
-      const kb = Math.max(0, window.innerHeight - vv.height);
+      //
+      // Only an on-screen keyboard is meant here. A window that changes size —
+      // going fullscreen and back — reports a viewport that does not match
+      // innerHeight for a moment, and with no further event the container
+      // keeps that gap: the message box ends up below the visible area. A
+      // pointer that is not touch has no on-screen keyboard to make room for.
+      const kb = navigator.maxTouchPoints > 0
+        ? Math.max(0, window.innerHeight - vv.height)
+        : 0;
       document.documentElement.style.setProperty('--keyboard-height', `${kb}px`);
     };
     vv.addEventListener('resize', update);
-    return () => vv.removeEventListener('resize', update);
+    // The window settles after the viewport does, so a fullscreen change is
+    // measured again from here rather than left at the value in between.
+    window.addEventListener('resize', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      window.removeEventListener('resize', update);
+    };
   }, []);
 
   return (
