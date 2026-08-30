@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Mic, Square, Loader2 } from 'lucide-react';
 
@@ -7,14 +8,43 @@ import type { VoiceInputState } from '../../hooks/useVoiceInput';
 type Props = {
   state: VoiceInputState;
   onToggle: () => void;
+  /** Press and hold: start recording. */
+  onHoldStart?: () => void;
+  /** Release after a hold: stop and send the transcript. */
+  onHoldEnd?: () => void;
   errorMsg?: string | null;
 };
 
-// Push-to-talk mic button (presentational). Recording state and the stop-and-send action
-// are owned by the composer so the main Send button can drive them too. This button just
-// starts recording and, while recording, stops and drops the transcript into the input box.
-export default function VoiceInputButton({ state, onToggle, errorMsg }: Props) {
+/**
+ * Push-to-talk mic button (presentational). Recording state and the
+ * stop-and-send action are owned by the composer so the main Send button can
+ * drive them too.
+ *
+ * Two ways to use it, the two the Claude extension offers as `voice.mode`:
+ *
+ *   hold  press and hold to record, release to stop - and submit, which is its
+ *         `autoSubmit` on release. This is the extension's default.
+ *   tap   a short click starts, the next click stops and drops the transcript
+ *         in the box.
+ *
+ * Which one is meant is decided by how long the button was held rather than by
+ * a setting: below the threshold it was a click, above it the user was holding
+ * the button down to speak.
+ */
+
+/** Shorter than this and it was a click, not someone holding the button to talk. */
+const HOLD_THRESHOLD_MS = 300;
+
+export default function VoiceInputButton({
+  state,
+  onToggle,
+  onHoldStart,
+  onHoldEnd,
+  errorMsg,
+}: Props) {
   const { t } = useTranslation('chat');
+  const pressedAt = useRef<number | null>(null);
+  const startedByHold = useRef(false);
 
   const icon =
     state === 'recording' ? (
@@ -25,6 +55,41 @@ export default function VoiceInputButton({ state, onToggle, errorMsg }: Props) {
       <Mic />
     );
 
+  const onPointerDown = useCallback(() => {
+    if (!onHoldStart) {
+      return;
+    }
+
+    pressedAt.current = Date.now();
+    // Whether this press is what started the recording decides what releasing
+    // it means: the end of a hold, or the second tap that stops one.
+    startedByHold.current = state === 'idle';
+    if (state === 'idle') {
+      onHoldStart();
+    }
+  }, [onHoldStart, state]);
+
+  const onPointerUp = useCallback(() => {
+    if (pressedAt.current === null) {
+      return;
+    }
+
+    const held = Date.now() - pressedAt.current;
+    pressedAt.current = null;
+
+    // Held down and released: that was a hold, so stop and submit.
+    if (startedByHold.current) {
+      if (held >= HOLD_THRESHOLD_MS) {
+        onHoldEnd?.();
+      }
+      // A short press only started it - the next tap stops it, below.
+      return;
+    }
+
+    // Pressed while already recording: the second tap. Same ending as a hold.
+    onHoldEnd?.();
+  }, [onHoldEnd]);
+
   return (
     <span className="relative inline-flex">
       {errorMsg && (
@@ -34,9 +99,18 @@ export default function VoiceInputButton({ state, onToggle, errorMsg }: Props) {
       )}
       <PromptInputButton
         tooltip={{ content: state === 'recording' ? t('voice.stopRecording') : t('voice.input') }}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        // A pointer that leaves the button still ends the hold; without this the
+        // recording would keep running with nothing to stop it.
+        onPointerLeave={onPointerUp}
         onClick={(e: { preventDefault: () => void }) => {
           e.preventDefault();
-          onToggle();
+          // Holding already started and stopped the recording; only a plain
+          // click still has to toggle.
+          if (!onHoldStart) {
+            onToggle();
+          }
         }}
       >
         {icon}

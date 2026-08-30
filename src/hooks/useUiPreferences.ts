@@ -36,12 +36,20 @@ const DEFAULTS: UiPreferences = {
   showThinking: true,
   sendByCtrlEnter: false,
   sidebarVisible: true,
-  voiceEnabled: false,
+  // Dictation is offered by default. The `false` here was the reason the mic
+  // never appeared: the defaults are written to localStorage as soon as any
+  // other preference is touched, so `voiceEnabled: false` ended up stored
+  // explicitly in every profile and stayed there. Whether dictation is
+  // possible at all is decided elsewhere - a transcription backend, or the
+  // browser's own recognition.
+  voiceEnabled: true,
 };
 
 const PREFERENCE_KEYS = Object.keys(DEFAULTS) as UiPreferenceKey[];
 const VALID_KEYS = new Set<UiPreferenceKey>(PREFERENCE_KEYS); // prevents unknown keys from being written
 const SYNC_EVENT = 'ui-preferences:sync';
+/** Marks that the one-time lift of `voiceEnabled` has already happened. */
+const VOICE_DEFAULT_APPLIED = 'voiceEnabledDefaultApplied';
 
 type SyncEventDetail = {
   storageKey: string;
@@ -88,10 +96,30 @@ const readInitialPreferences = (storageKey: string): UiPreferences => {
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         const parsedRecord = parsed as Record<string, unknown>;
 
-        return PREFERENCE_KEYS.reduce((acc, key) => {
+        const preferences = PREFERENCE_KEYS.reduce((acc, key) => {
           acc[key] = parseBoolean(parsedRecord[key], DEFAULTS[key]);
           return acc;
         }, { ...DEFAULTS });
+
+        // A profile written before dictation defaulted to on carries
+        // `voiceEnabled: false` - not a choice anyone made, just the old
+        // default that got saved the first time any other preference was
+        // touched. Lift it once, and remember having done so, so switching
+        // dictation off afterwards sticks.
+        if (!preferences.voiceEnabled && parsedRecord[VOICE_DEFAULT_APPLIED] !== true) {
+          preferences.voiceEnabled = true;
+          try {
+            localStorage.setItem(storageKey, JSON.stringify({
+              ...parsedRecord,
+              voiceEnabled: true,
+              [VOICE_DEFAULT_APPLIED]: true,
+            }));
+          } catch {
+            // Storage refused it; the value still holds for this session.
+          }
+        }
+
+        return preferences;
       }
     }
   } catch {

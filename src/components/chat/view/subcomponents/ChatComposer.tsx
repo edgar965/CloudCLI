@@ -13,7 +13,10 @@ import type {
 import { PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon } from 'lucide-react';
 
 import { useVoiceInput } from '../../hooks/useVoiceInput';
-import { useVoiceAvailable } from '../../hooks/useVoiceAvailable';
+import { useVoiceAvailable, useVoiceBackendReady } from '../../hooks/useVoiceAvailable';
+import { isSpeechRecognitionSupported, useSpeechRecognition } from '../../hooks/useSpeechRecognition';
+import { useClaudeSpeech } from '../../hooks/useClaudeSpeech';
+import { safeLocalStorage } from '../../utils/chatStorage';
 import type { QueuedDraft } from '../../hooks/useChatComposerState';
 import type { SessionActivity } from '../../../../hooks/useSessionProtection';
 import type { PendingPermissionRequest, PermissionMode } from '../../types/types';
@@ -222,6 +225,7 @@ export default function ChatComposer({
   // Voice state is hosted here (not in the mic button) so the main Send button can stop
   // recording and send the transcript in one tap, the way the mic button drops it in the box.
   const voiceAvailable = useVoiceAvailable();
+  const voiceBackendReady = useVoiceBackendReady();
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const voiceErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleVoiceError = useCallback((msg: string) => {
@@ -233,10 +237,34 @@ export default function ChatComposer({
     if (voiceErrorTimer.current) clearTimeout(voiceErrorTimer.current);
   }, []);
   const noopTranscript = useCallback(() => {}, []);
-  const { state: voiceState, toggle: voiceToggle, stop: voiceStop } = useVoiceInput(
+  const backendVoice = useVoiceInput(
     onVoiceTranscript ?? noopTranscript,
     handleVoiceError,
   );
+  const browserVoice = useSpeechRecognition(
+    onVoiceTranscript ?? noopTranscript,
+    handleVoiceError,
+  );
+  const claudeVoice = useClaudeSpeech(
+    onVoiceTranscript ?? noopTranscript,
+    handleVoiceError,
+  );
+
+  // Which dictation, in this order:
+  //   claude    always, when the provider is Claude: Anthropic's own
+  //             speech-to-text, the one Claude Code uses. No key needed, it
+  //             goes through this machine's Claude login.
+  //   whisper   for every other provider, when a backend is configured
+  //             (VOICE_API_BASE_URL - a groq or openai key, say).
+  //   browser   otherwise the browser's own recognition, as the Chrome
+  //             extension uses. Present in Chrome, usually silent in Electron.
+  // The provider is read where the chat itself keeps it (useChatProviderState);
+  // the composer only receives a display label.
+  const isClaude = (safeLocalStorage.getItem('selected-provider') || 'claude') === 'claude';
+  const useClaudeVoice = isClaude;
+  const useBrowserVoice = !useClaudeVoice && !voiceBackendReady && isSpeechRecognitionSupported();
+  const activeVoice = useClaudeVoice ? claudeVoice : useBrowserVoice ? browserVoice : backendVoice;
+  const { state: voiceState, toggle: voiceToggle, stop: voiceStop, start: voiceStart } = activeVoice;
   const isRecording = voiceState === 'recording';
   const isTranscribing = voiceState === 'transcribing';
 
@@ -416,7 +444,13 @@ export default function ChatComposer({
             </PromptInputButton>
 
             {onVoiceTranscript && voiceAvailable && (
-              <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />
+              <VoiceInputButton
+                state={voiceState}
+                onToggle={voiceToggle}
+                onHoldStart={() => { void voiceStart(); }}
+                onHoldEnd={() => voiceStop({ send: true })}
+                errorMsg={voiceError}
+              />
             )}
 
             <BrowserTabButton />
