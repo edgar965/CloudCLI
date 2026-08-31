@@ -345,6 +345,15 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     model: string,
     currentEffort: string,
   ): string => {
+    // The catalog is fetched from the server a moment after the page loads.
+    // Until it arrives nothing is known about this model's efforts, and
+    // answering "default" here does not just show the wrong value - the effect
+    // below writes that answer to localStorage. That is how a setting of
+    // "xhigh" turned itself back into the default on start after start.
+    if (!providerModelCatalog[targetProvider]) {
+      return currentEffort;
+    }
+
     const allowedValues = getAllowedEffortValues(targetProvider, model);
     if (allowedValues.length === 0) {
       return DEFAULT_EFFORT_VALUE;
@@ -359,7 +368,7 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     }
 
     return DEFAULT_EFFORT_VALUE;
-  }, [getAllowedEffortValues]);
+  }, [getAllowedEffortValues, providerModelCatalog]);
 
   const providerModels = useMemo<Record<LLMProvider, string>>(() => ({
     claude: claudeModel,
