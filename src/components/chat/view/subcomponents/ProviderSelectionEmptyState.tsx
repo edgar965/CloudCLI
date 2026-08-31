@@ -128,6 +128,20 @@ export default function ProviderSelectionEmptyState({
   const [modelSearch, setModelSearch] = useState("");
 
   /**
+   * Opens and closes the picker, clearing the search on the way out.
+   *
+   * The search box is controlled, so a query left behind comes back with the
+   * dialog - and brings every branch open with it, since searching expands
+   * them. Reopening would undo the collapsing this picker is built around.
+   */
+  const setPickerOpen = useCallback((open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setModelSearch("");
+    }
+  }, []);
+
+  /**
    * One branch per provider, plus a separate one for Ollama.
    *
    * Ollama models reach the catalog through OpenCode (`ollama/<model>`) and
@@ -204,20 +218,20 @@ export default function ProviderSelectionEmptyState({
       setProvider(providerId);
       localStorage.setItem("selected-provider", providerId);
       setModelForProvider(providerId, modelValue);
-      setDialogOpen(false);
+      setPickerOpen(false);
       setTimeout(() => textareaRef.current?.focus(), 100);
     },
-    [setProvider, setModelForProvider, textareaRef],
+    [setProvider, setModelForProvider, setPickerOpen, textareaRef],
   );
 
   const openModelLibrary = () => {
-    setDialogOpen(false);
+    setPickerOpen(false);
     setModelLibraryOpen(true);
   };
 
   const closeModelLibrary = () => {
     setModelLibraryOpen(false);
-    setDialogOpen(true);
+    setPickerOpen(true);
   };
 
   if (!selectedSession && !currentSessionId) {
@@ -233,7 +247,7 @@ export default function ProviderSelectionEmptyState({
             </p>
           </div>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={setPickerOpen}>
             <DialogTrigger asChild>
               <Card
                 className="group mx-auto max-w-xs cursor-pointer border-border/60 transition-all duration-150 hover:border-border hover:shadow-md active:scale-[0.99]"
