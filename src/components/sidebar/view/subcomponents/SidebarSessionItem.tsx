@@ -66,6 +66,7 @@ export default function SidebarSessionItem({
   const isEditing = editingSession === session.id;
   const compactSessionAge = formatCompactAge(sessionView.sessionTime, currentTime);
   const editingContainerRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
   const [isMobileOptionsOpen, setIsMobileOptionsOpen] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const [providerSessionId, setProviderSessionId] = useState<string | null>(null);
@@ -73,6 +74,27 @@ export default function SidebarSessionItem({
   const showAttentionIndicator = needsAttention && !isSelected;
   const showRecentIndicator = !showAttentionIndicator && !isProcessing && sessionView.isActive;
   const providerLabel = PROVIDER_LABELS[session.__provider];
+
+  /**
+   * Brings the open session into view.
+   *
+   * A window that starts on a conversation far down a long list showed the
+   * top of that list, and finding the chat one is actually in meant
+   * scrolling for it. `nearest` means a row already on screen is left where
+   * it is, so switching sessions by clicking does not jerk the list around.
+   */
+  useEffect(() => {
+    if (!isSelected) {
+      return;
+    }
+
+    // After the row has been laid out, or the offset is measured against a
+    // list that is not there yet.
+    const frame = requestAnimationFrame(() => {
+      rowRef.current?.scrollIntoView({ block: 'nearest' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isSelected]);
 
   // While editing, dismiss only when the user clicks outside the inline rename panel
   // (matches Escape / cancel-button behaviour). The mobile rename lives inside the
@@ -193,7 +215,7 @@ export default function SidebarSessionItem({
         : `Copy ${providerLabel} session ID`;
 
   return (
-    <div className="group relative">
+    <div ref={rowRef} className="group relative">
       {(showAttentionIndicator || showRecentIndicator) && (
         <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 transform">
           <Tooltip

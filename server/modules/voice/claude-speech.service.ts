@@ -111,6 +111,17 @@ export class ClaudeSpeechStream {
    */
   private ended = false;
 
+  /**
+   * Whether the upstream ever said anything about this recording.
+   *
+   * A socket that closes after a transcript, or after `TranscriptEndpoint`,
+   * ended normally. One that closes before either did not: the recording was
+   * cut off - a refused token, a protocol error, a dropped line - and
+   * reporting that as a finished dictation puts "No speech detected" in front
+   * of the user, which is a different problem with a different fix.
+   */
+  private heardUpstream = false;
+
   constructor(private readonly events: SpeechEvents) {}
 
   /** The end is reported once, whichever of the two says so first. */
@@ -180,11 +191,26 @@ export class ClaudeSpeechStream {
     });
     socket.on('message', (raw: Buffer) => this.handleMessage(raw.toString()));
     socket.on('error', (error: Error) => this.events.onError(error.message));
-    socket.on('close', () => {
+    socket.on('close', (code: number, reason: Buffer) => {
       this.upstream = null;
-      if (!this.closing) {
-        this.emitEnd();
+      if (this.closing) {
+        return;
       }
+
+      if (this.heardUpstream) {
+        this.emitEnd();
+        return;
+      }
+
+      // Closed without ever transcribing anything. Saying "the dictation
+      // ended" here is what turned every one of these into "No speech
+      // detected" - the close code is the only thing that says what really
+      // happened, so it goes to the user.
+      const detail = reason?.toString().trim();
+      this.events.onError(
+        `The dictation service closed the connection (${code}${detail ? `: ${detail}` : ''}).`,
+      );
+      this.ended = true;
     });
 
     this.upstream = socket;
@@ -194,10 +220,12 @@ export class ClaudeSpeechStream {
     try {
       const message = JSON.parse(text) as { type?: string; data?: unknown };
       if (message.type === 'TranscriptText' && typeof message.data === 'string') {
+        this.heardUpstream = true;
         this.events.onTranscript(message.data);
         return;
       }
       if (message.type === 'TranscriptEndpoint') {
+        this.heardUpstream = true;
         this.emitEnd();
       }
     } catch {

@@ -90,7 +90,7 @@ export default function SidebarProjectSessions({
     <div className="ml-3 space-y-1 border-l border-border pl-3">
       <div className="px-3 pb-1 pt-1 md:hidden">
         <button
-          className="flex h-8 w-full items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/10 text-xs font-medium text-primary transition-all duration-150 hover:bg-primary/20 active:scale-[0.98]"
+          className="flex h-8 w-full items-center justify-center gap-2 rounded-md text-xs font-medium text-muted-foreground transition-all duration-150 hover:bg-accent hover:text-foreground active:scale-[0.98]"
           onClick={() => {
             onProjectSelect(project);
             onNewSession(project);
@@ -101,14 +101,16 @@ export default function SidebarProjectSessions({
         </button>
       </div>
 
-      {/* An outline rather than a filled button: starting a session is an
-          action one reaches for now and then, while the open session is a
-          state that has to stand out at a glance. Filled, it drew the eye
-          away from the chat actually being used. */}
+      {/* No frame and no fill: starting a session is an action one reaches
+          for now and then, while the open session is a state that has to
+          stand out at a glance. Anything drawn around this button competes
+          with the marker on the session actually in use - which is the one
+          thing the list has to answer. It gets its outline on hover, when it
+          is being aimed at. */}
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
-        className="hidden h-8 w-full justify-start gap-2 border-primary/40 bg-primary/10 text-xs font-medium text-primary transition-colors hover:bg-primary/20 md:flex"
+        className="hidden h-8 w-full justify-start gap-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground md:flex"
         onClick={() => onNewSession(project)}
       >
         <Plus className="h-3 w-3" />
