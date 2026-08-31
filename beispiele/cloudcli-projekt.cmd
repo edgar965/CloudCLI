@@ -151,7 +151,13 @@ goto :ende
 
 rem ----- Server bereitstellen ----------------------------------
 set "SYS=%SystemRoot%\System32"
-"%SYS%\netstat.exe" -an | "%SYS%\find.exe" "127.0.0.1:%PORT%" | "%SYS%\find.exe" "LISTENING" >nul
+rem Over /health rather than netstat: its output is translated, and on a
+rem German Windows it reads "ABHOEREN" where this looked for "LISTENING".
+rem The search found nothing, so a second server was started and the
+rem script then gave up waiting for one that had been there all along.
+rem /health also says whether it is CloudCLI answering, not just that
+rem something holds the port.
+call :istda
 if not errorlevel 1 (
     echo Server auf %PORT% laeuft schon - er wird mitbenutzt.
     goto :starten
@@ -177,7 +183,7 @@ powershell -NoProfile -Command "Start-Process -FilePath cmd.exe -ArgumentList '/
 set /a VERSUCHE=0
 :warten
 set /a VERSUCHE+=1
-"%SYS%\netstat.exe" -an | "%SYS%\find.exe" "127.0.0.1:%PORT%" | "%SYS%\find.exe" "LISTENING" >nul
+call :istda
 if not errorlevel 1 goto :serverbereit
 if %VERSUCHE% GEQ 30 (
     echo FEHLER: Server auf 127.0.0.1:%PORT% nicht bereit geworden.
@@ -189,6 +195,12 @@ goto :warten
 
 :serverbereit
 echo Server bereit.
+goto :starten
+
+rem Antwortet auf %PORT% ein CloudCLI-Server? errorlevel 0 = ja.
+:istda
+powershell -NoProfile -Command "try { $r = Invoke-WebRequest 'http://127.0.0.1:%PORT%/health' -UseBasicParsing -TimeoutSec 2; if ($r.Content -match 'installMode') { exit 0 } } catch {}; exit 1"
+goto :eof
 
 :starten
 if "%BROWSER%"=="1" (
