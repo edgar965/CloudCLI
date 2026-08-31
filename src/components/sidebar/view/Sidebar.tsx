@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useDeviceSettings } from '../../../hooks/useDeviceSettings';
@@ -10,6 +10,8 @@ import { usePaletteOps } from '../../../contexts/PaletteOpsContext';
 import { useTasksSettings } from '../../../contexts/TasksSettingsContext';
 import type { Project, LLMProvider } from '../../../types/app';
 import type { MCPServerStatus, SidebarProps } from '../types/types';
+import { SessionSelectionProvider } from '../hooks/SessionSelectionContext';
+import { useSessionSelection } from '../hooks/useSessionSelection';
 
 import SidebarCollapsed from './subcomponents/SidebarCollapsed';
 import SidebarContent from './subcomponents/SidebarContent';
@@ -152,6 +154,19 @@ function Sidebar({
     void paletteOps.refreshProjects();
   };
 
+  /**
+   * Picking several conversations to delete in one go.
+   *
+   * Held here rather than per project list: the same selection has to be
+   * readable by the rows and by the bar above them, and both are rendered
+   * further down the tree.
+   */
+  const selection = useSessionSelection(useCallback((ids: string[]) => {
+    for (const id of ids) {
+      onSessionDelete?.(id);
+    }
+  }, [onSessionDelete]));
+
   const projectListProps: SidebarProjectListProps = {
     projects,
     filteredProjects,
@@ -205,7 +220,7 @@ function Sidebar({
   };
 
   return (
-    <>
+    <SessionSelectionProvider value={selection}>
         <SidebarModals
           projects={projects}
         showSettings={showSettings}
@@ -327,7 +342,7 @@ function Sidebar({
         </>
       )}
 
-    </>
+    </SessionSelectionProvider>
   );
 }
 

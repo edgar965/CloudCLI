@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Copy, Edit2, Loader2, MoreHorizontal, Trash2, X } from 'lucide-react';
+import { Check, Copy, Edit2, Loader2, MoreHorizontal, Square, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, Badge, Dialog, DialogContent, DialogTitle, Tooltip, buttonVariants } from '../../../../shared/view/ui';
@@ -10,6 +10,7 @@ import { copyTextToClipboard } from '../../../../utils/clipboard';
 import type { SessionWithProvider } from '../../types/types';
 import { createSessionViewModel, formatCompactAge } from '../../utils/utils';
 import LLMProviderLogo from '../../../llm-provider-logo/LLMProviderLogo';
+import { useSelectionContext } from '../../hooks/SessionSelectionContext';
 
 type SidebarSessionItemProps = {
   project: Project;
@@ -32,6 +33,8 @@ type SidebarSessionItemProps = {
     sessionTitle: string,
     provider: LLMProvider,
   ) => void;
+  /** The list as shown, so a shift-click knows what lies between two rows. */
+  orderedSessionIds?: string[];
   t: TFunction;
 };
 
@@ -59,6 +62,7 @@ export default function SidebarSessionItem({
   onProjectSelect,
   onSessionSelect,
   onDeleteSession,
+  orderedSessionIds = [],
   t,
 }: SidebarSessionItemProps) {
   const sessionView = createSessionViewModel(session, currentTime, t);
@@ -67,6 +71,8 @@ export default function SidebarSessionItem({
   const compactSessionAge = formatCompactAge(sessionView.sessionTime, currentTime);
   const editingContainerRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+  const selection = useSelectionContext();
+  const isPicked = Boolean(selection?.isSelected(session.id));
   const [isMobileOptionsOpen, setIsMobileOptionsOpen] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const [providerSessionId, setProviderSessionId] = useState<string | null>(null);
@@ -472,14 +478,47 @@ export default function SidebarSessionItem({
           }}
         >
           <div className="flex w-full min-w-0 items-center gap-2">
-            <div
+            {/* The provider mark doubles as the checkbox: hovering it, or
+                having anything picked, turns it into one. A column of its own
+                would cost every row width it does not have, and the mark is
+                exactly where a checkbox belongs anyway. */}
+            <span
+              role={selection ? 'checkbox' : undefined}
+              aria-checked={selection ? isPicked : undefined}
+              tabIndex={selection ? 0 : undefined}
+              onClick={(event) => {
+                if (!selection) return;
+                // Inside the row's <a>: without this the click navigates.
+                event.preventDefault();
+                event.stopPropagation();
+                selection.toggle(session.id, orderedSessionIds, event.shiftKey);
+              }}
+              onKeyDown={(event) => {
+                if (!selection || (event.key !== ' ' && event.key !== 'Enter')) return;
+                event.preventDefault();
+                event.stopPropagation();
+                selection.toggle(session.id, orderedSessionIds, event.shiftKey);
+              }}
               className={cn(
-                'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
-                isSelected ? 'bg-primary/25' : 'bg-muted/50',
+                'group/pick flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
+                selection && 'cursor-pointer',
+                isPicked
+                  ? 'bg-primary text-primary-foreground'
+                  : isSelected ? 'bg-primary/25' : 'bg-muted/50',
               )}
             >
-              <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
-            </div>
+              {isPicked ? (
+                <Check className="h-3 w-3" />
+              ) : (
+                <>
+                  <LLMProviderLogo
+                    provider={session.__provider}
+                    className={cn('h-3 w-3', selection && 'group-hover/pick:hidden')}
+                  />
+                  {selection && <Square className="hidden h-3 w-3 group-hover/pick:block" />}
+                </>
+              )}
+            </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <div

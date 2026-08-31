@@ -142,5 +142,12 @@
     "deleteAllData": "永久刪除所有資料",
     "allConversationsDeleted": "專案將從側邊欄中移除。您的檔案、記憶和工作階段資料將會保留。",
     "cannotUndo": "您可以稍後重新新增此專案。"
+  },
+  "selection": {
+    "count": "已選擇 {{count}} 個",
+    "toggleAll": "全選（{{total}} 個）",
+    "delete": "刪除",
+    "confirmDelete": "刪除 {{count}} 個？",
+    "clear": "取消選擇"
   }
 }

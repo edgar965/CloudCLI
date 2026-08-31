@@ -143,5 +143,12 @@
     "deleteAllData": "Supprimer toutes les données définitivement",
     "allConversationsDeleted": "Le projet sera retiré de la barre latérale. Vos fichiers, mémoires et données de session seront conservés.",
     "cannotUndo": "Vous pourrez rajouter le projet ultérieurement."
+  },
+  "selection": {
+    "count": "{{count}} sélectionnées",
+    "toggleAll": "Tout sélectionner ({{total}})",
+    "delete": "Supprimer",
+    "confirmDelete": "Supprimer {{count}} ?",
+    "clear": "Annuler la sélection"
   }
 }

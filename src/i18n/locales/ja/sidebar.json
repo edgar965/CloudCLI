@@ -127,5 +127,12 @@
     "deleteAllData": "すべてのデータを完全に削除",
     "allConversationsDeleted": "プロジェクトはサイドバーから除去されます。ファイル、メモリ、セッションデータは保持されます。",
     "cannotUndo": "後からプロジェクトを再追加できます。"
+  },
+  "selection": {
+    "count": "{{count}} 件選択中",
+    "toggleAll": "すべて選択（{{total}}件）",
+    "delete": "削除",
+    "confirmDelete": "{{count}} 件を削除しますか？",
+    "clear": "選択を解除"
   }
 }

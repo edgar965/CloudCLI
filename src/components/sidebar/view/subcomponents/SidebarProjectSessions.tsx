@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
@@ -5,7 +6,9 @@ import { Button } from '../../../../shared/view/ui';
 import type { SessionActivityMap } from '../../../../hooks/useSessionProtection';
 import type { Project, ProjectSession, LLMProvider } from '../../../../types/app';
 import type { SessionWithProvider } from '../../types/types';
+import { useSelectionContext } from '../../hooks/SessionSelectionContext';
 
+import SidebarSelectionBar from './SidebarSelectionBar';
 import SidebarSessionItem from './SidebarSessionItem';
 
 type SidebarProjectSessionsProps = {
@@ -80,6 +83,11 @@ export default function SidebarProjectSessions({
   onNewSession,
   t,
 }: SidebarProjectSessionsProps) {
+  // Before the early return below: hooks may not be skipped on a render.
+  const selection = useSelectionContext();
+  // The ids as shown, so a shift-click knows what lies between two rows.
+  const orderedSessionIds = useMemo(() => sessions.map((s) => s.id), [sessions]);
+
   if (!isExpanded) {
     return null;
   }
@@ -117,6 +125,19 @@ export default function SidebarProjectSessions({
         {t('sessions.newSession')}
       </Button>
 
+      {selection && (
+        <SidebarSelectionBar
+          count={selection.selectedCount}
+          total={orderedSessionIds.length}
+          allSelected={orderedSessionIds.length > 0
+            && orderedSessionIds.every((id) => selection.isSelected(id))}
+          busy={selection.busy}
+          onToggleAll={() => selection.toggleAll(orderedSessionIds)}
+          onDelete={() => { void selection.deleteSelected(); }}
+          onClear={selection.clear}
+        />
+      )}
+
       {!initialSessionsLoaded ? (
         <SessionListSkeleton />
       ) : !hasSessions ? (
@@ -143,6 +164,7 @@ export default function SidebarProjectSessions({
               onProjectSelect={onProjectSelect}
               onSessionSelect={onSessionSelect}
               onDeleteSession={onDeleteSession}
+              orderedSessionIds={orderedSessionIds}
               t={t}
             />
           ))}
