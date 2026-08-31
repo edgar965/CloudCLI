@@ -33,6 +33,7 @@ type ClaudeSettingsStorage = {
   allowedTools?: string[];
   disallowedTools?: string[];
   skipPermissions?: boolean;
+  keepSessionAlive?: boolean;
   projectSortOrder?: ProjectSortOrder;
 };
 
@@ -97,6 +98,7 @@ const createEmptyClaudePermissions = (): ClaudePermissionsState => ({
   allowedTools: [],
   disallowedTools: [],
   skipPermissions: false,
+  keepSessionAlive: false,
 });
 
 const createEmptyCursorPermissions = (): CursorPermissionsState => ({
@@ -177,6 +179,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
         allowedTools: savedClaudeSettings.allowedTools || [],
         disallowedTools: savedClaudeSettings.disallowedTools || [],
         skipPermissions: Boolean(savedClaudeSettings.skipPermissions),
+        keepSessionAlive: Boolean(savedClaudeSettings.keepSessionAlive),
       });
       setProjectSortOrder(savedClaudeSettings.projectSortOrder === 'date' ? 'date' : 'name');
 
@@ -252,6 +255,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
         allowedTools: claudePermissions.allowedTools,
         disallowedTools: claudePermissions.disallowedTools,
         skipPermissions: claudePermissions.skipPermissions,
+        keepSessionAlive: claudePermissions.keepSessionAlive,
         projectSortOrder,
         lastUpdated: now,
       }));

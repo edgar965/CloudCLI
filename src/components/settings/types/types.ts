@@ -23,6 +23,8 @@ export type ClaudePermissionsState = {
   allowedTools: string[];
   disallowedTools: string[];
   skipPermissions: boolean;
+  /** Keep one CLI process for a whole conversation instead of one per message. */
+  keepSessionAlive: boolean;
 };
 
 export type NotificationPreferencesState = {
