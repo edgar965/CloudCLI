@@ -419,7 +419,11 @@ export default function ChatComposer({
 
 
         <PromptInputFooter className="border-b border-t-0">
-          <PromptInputTools className="shrink-0">
+          {/* The tools give way, the send side does not: on a narrow
+              screen the two groups together outgrow the footer, which
+              neither wraps nor scrolls, and `PromptInput` clips what
+              overflows - putting whichever control lost out of reach. */}
+          <PromptInputTools className="scrollbar-hide min-w-0 flex-1 overflow-x-auto">
             <PromptInputButton
               tooltip={{ content: t('input.attachFiles') }}
               onClick={openAttachmentPicker}
