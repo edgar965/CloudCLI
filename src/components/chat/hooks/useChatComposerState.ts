@@ -1231,6 +1231,12 @@ export function useChatComposerState({
       const newValue = event.target.value;
       const cursorPos = event.target.selectionStart;
 
+      // Typing ends any claim a dictation had on the box. Without this, one
+      // that stopped without a final transcript - an upstream error, a dropped
+      // connection - would leave its base behind, and the next recording would
+      // replace whatever was typed in the meantime.
+      voiceBase.current = null;
+
       setInput(newValue);
       inputValueRef.current = newValue;
       setCursorPosition(cursorPos);
