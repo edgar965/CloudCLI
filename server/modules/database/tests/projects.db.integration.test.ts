@@ -8,6 +8,18 @@ import { closeConnection } from '@/modules/database/connection.js';
 import { initializeDatabase } from '@/modules/database/init-db.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
 
+/**
+ * A stored project path, spelled the way the platform running the test spells it.
+ *
+ * `normalizeProjectPath` applies the host's rules: on Windows `/workspace/x`
+ * becomes `\workspace\x` - the same directory, in Windows notation. Without
+ * following that here the expectation only ever held on posix. The
+ * normalization itself is covered by its own tests.
+ */
+function stored(projectPath: string): string {
+  return path.normalize(projectPath);
+}
+
 async function withIsolatedDatabase(runTest: () => void | Promise<void>): Promise<void> {
   const previousDatabasePath = process.env.DATABASE_PATH;
   const tempDirectory = await mkdtemp(path.join(tmpdir(), 'projects-db-'));
@@ -36,7 +48,7 @@ test('projectsDb.createProjectPath returns created for fresh paths', async () =>
 
     assert.equal(created.outcome, 'created');
     assert.ok(created.project);
-    assert.equal(created.project?.project_path, '/workspace/new-project');
+    assert.equal(created.project?.project_path, stored('/workspace/new-project'));
     assert.equal(created.project?.isArchived, 0);
   });
 });

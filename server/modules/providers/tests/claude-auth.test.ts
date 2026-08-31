@@ -49,13 +49,26 @@ const withEnv = async (
   }
 };
 
+// `os.homedir()` reads HOME on posix, but on Windows it follows USERPROFILE and
+// ignores HOME entirely - measured: with only HOME pointed at a temp directory
+// it still answered the real profile. Setting HOME alone therefore isolated
+// nothing there; the provider read the actual ~/.claude of whoever ran the
+// tests, which is why "not authenticated" came back authenticated, carrying
+// that person's own email.
 const withTempHome = async (fn: (homeDir: string) => Promise<void>) => {
   const homeDir = await mkdtemp(path.join(os.tmpdir(), 'claude-auth-test-'));
   const originalHome = process.env.HOME;
+  const originalUserProfile = process.env.USERPROFILE;
   process.env.HOME = homeDir;
+  process.env.USERPROFILE = homeDir;
   try {
     await fn(homeDir);
   } finally {
+    if (originalUserProfile === undefined) {
+      delete process.env.USERPROFILE;
+    } else {
+      process.env.USERPROFILE = originalUserProfile;
+    }
     if (originalHome === undefined) {
       delete process.env.HOME;
     } else {
