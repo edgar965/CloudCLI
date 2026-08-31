@@ -31,6 +31,7 @@ import {
   PromptInputButton,
   PromptInputSubmit,
 } from '../../../../shared/view/ui';
+import { usePushToTalkKey } from '../../hooks/usePushToTalkKey';
 
 import CommandMenu from './CommandMenu';
 import ActivityIndicator from './ActivityIndicator';
@@ -267,6 +268,14 @@ export default function ChatComposer({
   const activeVoice = useClaudeVoice ? claudeVoice : useBrowserVoice ? browserVoice : backendVoice;
   const { state: voiceState, toggle: voiceToggle, stop: voiceStop, start: voiceStart } = activeVoice;
   const isRecording = voiceState === 'recording';
+
+  // Ctrl+D does what holding the mic button does, without reaching for it.
+  usePushToTalkKey({
+    enabled: Boolean(onVoiceTranscript && voiceAvailable),
+    isRecording,
+    onStart: () => { void voiceStart(); },
+    onStop: () => voiceStop({ send: true }),
+  });
   const isTranscribing = voiceState === 'transcribing';
 
   // Detect if the AskUserQuestion interactive panel is active

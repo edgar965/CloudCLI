@@ -205,6 +205,8 @@ function ChatInterface({
     cyclePermissionMode,
     currentProviderModel,
     currentProviderEffort,
+    currentProviderEffortOptions,
+    selectProviderEffort,
     isLoading: isProcessing,
     processingSessions,
     canAbortSession,

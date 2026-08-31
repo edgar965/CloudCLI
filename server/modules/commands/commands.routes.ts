@@ -181,6 +181,15 @@ const builtInCommands = [
     metadata: { type: "builtin" },
   },
   {
+    // Handled in the composer, never here: it sets the effort for the open
+    // session and says so, rather than being expanded into a prompt. Listed
+    // so it shows up in the command menu and completes while typing.
+    name: "/effort",
+    description: "Set the reasoning effort, or show what this model offers",
+    namespace: "builtin",
+    metadata: { type: "builtin" },
+  },
+  {
     name: "/cost",
     description: "Display token usage information",
     namespace: "builtin",

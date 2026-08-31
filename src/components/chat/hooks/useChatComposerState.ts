@@ -31,6 +31,7 @@ import type {
 import type { Project, ProjectSession, LLMProvider, ProviderModelOption } from '../../../types/app';
 import { escapeRegExp } from '../utils/chatFormatting';
 import { openChromeTab, reportChromeTab } from '../utils/chromeTab';
+import { resolveEffortCommand, type EffortOption } from '../utils/effortCommand';
 
 import { useFileMentions } from './useFileMentions';
 import { type SlashCommand, useSlashCommands } from './useSlashCommands';
@@ -49,6 +50,13 @@ interface UseChatComposerStateArgs {
    */
   currentProviderModel: string;
   currentProviderEffort: string;
+  /** What this model accepts, for `/effort` to check against. */
+  currentProviderEffortOptions?: EffortOption[];
+  selectProviderEffort?: (
+    provider: LLMProvider,
+    effort: string,
+    sessionId?: string | null,
+  ) => Promise<unknown>;
   isLoading: boolean;
   processingSessions?: SessionActivityMap;
   canAbortSession: boolean;
@@ -239,6 +247,8 @@ export function useChatComposerState({
   resolvePermissionModeForProvider,
   currentProviderModel,
   currentProviderEffort,
+  currentProviderEffortOptions,
+  selectProviderEffort,
   isLoading,
   processingSessions,
   canAbortSession,
@@ -421,6 +431,32 @@ export function useChatComposerState({
         return;
       }
 
+      // "/effort" is the same kind of command: it changes a setting and says
+      // so, rather than becoming a prompt. Which values exist depends on the
+      // model, so `resolveEffortCommand` checks against the catalog.
+      if (command.name === '/effort') {
+        const typed = rawInput ?? input;
+        const match = typed.match(new RegExp(`${escapeRegExp(command.name)}\\s*(.*)`));
+        const outcome = resolveEffortCommand(
+          match?.[1] ?? '',
+          currentProviderEffort || null,
+          currentProviderEffortOptions ?? [],
+        );
+
+        setInput('');
+        inputValueRef.current = '';
+        addMessage({ type: 'assistant', content: outcome.message, timestamp: Date.now() });
+
+        if (outcome.effort && selectProviderEffort) {
+          void selectProviderEffort(
+            provider,
+            outcome.effort,
+            currentSessionId || selectedSession?.id || null,
+          );
+        }
+        return;
+      }
+
       try {
         const effectiveInput = rawInput ?? input;
         const commandMatch = effectiveInput.match(new RegExp(`${escapeRegExp(command.name)}\\s*(.*)`));
@@ -484,11 +520,14 @@ export function useChatComposerState({
     },
     [
       currentProviderModel,
+      currentProviderEffort,
+      currentProviderEffortOptions,
       currentSessionId,
       handleBuiltInCommand,
       handleCustomCommand,
       input,
       provider,
+      selectProviderEffort,
       selectedProject,
       selectedSession?.id,
       addMessage,

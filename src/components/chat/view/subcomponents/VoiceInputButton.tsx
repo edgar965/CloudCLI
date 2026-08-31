@@ -103,7 +103,12 @@ export default function VoiceInputButton({
         </span>
       )}
       <PromptInputButton
-        tooltip={{ content: state === 'recording' ? t('voice.stopRecording') : t('voice.input') }}
+        // The shortcut is on the tooltip because that is where someone looks
+        // for it: the key itself is the same on every language, so it is
+        // appended rather than translated.
+        tooltip={{
+          content: `${state === 'recording' ? t('voice.stopRecording') : t('voice.input')} (Ctrl+D)`,
+        }}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         // A pointer the system takes away (a gesture, a lost device) ends the
