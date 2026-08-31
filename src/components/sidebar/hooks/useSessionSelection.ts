@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { api } from '../../../utils/api';
 
-import { applyPick } from './sessionPick';
+import { applyPick, emptyPick, pickedIds } from './sessionPick';
+import type { PickState } from './sessionPick';
 
 /**
  * Picking several sessions at once, to delete them in one go.
@@ -27,17 +28,13 @@ export type BatchDeleteOutcome = {
  * @param onDeleted - Told which sessions went, so the list can drop them
  */
 export function useSessionSelection(onDeleted?: (ids: string[]) => void) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pick, setPick] = useState<PickState>(emptyPick);
   const [busy, setBusy] = useState(false);
-  /** Where the last plain click landed, for shift-click to reach back to. */
-  const anchor = useRef<string | null>(null);
+  const selected = useMemo(() => pickedIds(pick), [pick]);
 
   const isSelected = useCallback((id: string) => selected.has(id), [selected]);
 
-  const clear = useCallback(() => {
-    setSelected(new Set());
-    anchor.current = null;
-  }, []);
+  const clear = useCallback(() => setPick(emptyPick), []);
 
   /**
    * Adds or removes one session; with `shiftKey`, everything from the last
@@ -48,22 +45,16 @@ export function useSessionSelection(onDeleted?: (ids: string[]) => void) {
    * @param shiftKey - Whether the range from the previous click is meant
    */
   const toggle = useCallback((id: string, orderedIds: string[], shiftKey = false) => {
-    // Read the anchor here, not inside the updater below: React runs updaters
-    // at render time, and the line after this one has already moved the
-    // anchor by then. Reading it late made every shift-range see itself as
-    // the anchor and fall back to picking the single row.
-    const from = anchor.current;
-    anchor.current = id;
-
-    setSelected((previous) => applyPick(previous, { id, orderedIds, shiftKey, anchor: from }));
+    setPick((previous) => applyPick(previous, { id, orderedIds, shiftKey }));
   }, []);
 
   /** Picks every session the list is showing, or drops them all. */
   const toggleAll = useCallback((orderedIds: string[]) => {
-    setSelected((previous) => (
-      orderedIds.every((id) => previous.has(id)) ? new Set() : new Set(orderedIds)
-    ));
-    anchor.current = null;
+    setPick((previous) => {
+      const all = pickedIds(previous);
+      const complete = orderedIds.length > 0 && orderedIds.every((id) => all.has(id));
+      return { base: complete ? new Set() : new Set(orderedIds), range: [], anchor: null };
+    });
   }, []);
 
   /**
@@ -101,8 +92,7 @@ export function useSessionSelection(onDeleted?: (ids: string[]) => void) {
         }
       }
     } finally {
-      setSelected(new Set(failed));
-      anchor.current = null;
+      setPick({ base: new Set(failed), range: [], anchor: null });
       setBusy(false);
     }
 
