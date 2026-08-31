@@ -90,7 +90,7 @@ export default function SidebarProjectSessions({
     <div className="ml-3 space-y-1 border-l border-border pl-3">
       <div className="px-3 pb-1 pt-1 md:hidden">
         <button
-          className="flex h-8 w-full items-center justify-center gap-2 rounded-md bg-primary text-xs font-medium text-primary-foreground transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
+          className="flex h-8 w-full items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/10 text-xs font-medium text-primary transition-all duration-150 hover:bg-primary/20 active:scale-[0.98]"
           onClick={() => {
             onProjectSelect(project);
             onNewSession(project);
@@ -101,10 +101,14 @@ export default function SidebarProjectSessions({
         </button>
       </div>
 
+      {/* An outline rather than a filled button: starting a session is an
+          action one reaches for now and then, while the open session is a
+          state that has to stand out at a glance. Filled, it drew the eye
+          away from the chat actually being used. */}
       <Button
-        variant="default"
+        variant="outline"
         size="sm"
-        className="hidden h-8 w-full justify-start gap-2 bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 md:flex"
+        className="hidden h-8 w-full justify-start gap-2 border-primary/40 bg-primary/10 text-xs font-medium text-primary transition-colors hover:bg-primary/20 md:flex"
         onClick={() => onNewSession(project)}
       >
         <Plus className="h-3 w-3" />

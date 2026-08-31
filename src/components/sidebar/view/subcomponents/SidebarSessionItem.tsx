@@ -220,7 +220,9 @@ export default function SidebarSessionItem({
         <div
           className={cn(
             'p-2 mx-3 my-0.5 rounded-md bg-card border active:scale-[0.98] transition-all duration-150 relative',
-            isSelected ? 'bg-primary/5 border-primary/20' : '',
+            isSelected
+              ? 'bg-primary/15 border-primary/30 before:absolute before:left-0 before:top-1/2 before:h-6 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-primary'
+              : '',
             !isSelected && isProcessing
               ? 'border-border/60 bg-muted/20'
               : !isSelected && sessionView.isActive
@@ -233,7 +235,7 @@ export default function SidebarSessionItem({
             <div
               className={cn(
                 'w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0',
-                isSelected ? 'bg-primary/10' : 'bg-muted/50',
+                isSelected ? 'bg-primary/25' : 'bg-muted/50',
               )}
             >
               <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
@@ -242,7 +244,10 @@ export default function SidebarSessionItem({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <div
-                  className="min-w-0 flex-1 truncate text-sm font-normal text-foreground"
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-sm text-foreground',
+                    isSelected ? 'font-medium' : 'font-normal',
+                  )}
                   title={sessionView.sessionName}
                 >
                   {sessionView.sessionName}
@@ -420,8 +425,14 @@ export default function SidebarSessionItem({
           href={`/session/${session.id}`}
           className={cn(
             buttonVariants({ variant: 'ghost' }),
-            'h-auto w-full justify-start rounded-md border bg-card p-2 pr-11 text-left font-normal transition-all duration-150',
-            isSelected ? 'border-primary/20 bg-primary/5' : 'border-border/30',
+            'relative h-auto w-full justify-start rounded-md border bg-card p-2 pr-11 text-left font-normal transition-all duration-150',
+            // The open session carries the strongest mark in the list: a bar in
+            // the accent colour and a tinted background. At 5% it was all but
+            // invisible next to the solid "New Session" button, which made the
+            // button look like the active chat.
+            isSelected
+              ? 'border-primary/30 bg-primary/15 before:absolute before:left-0 before:top-1/2 before:h-6 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-primary'
+              : 'border-border/30',
             !isSelected && isProcessing
               ? 'border-border/60 bg-muted/20 hover:bg-muted/25'
               : !isSelected && sessionView.isActive
@@ -440,7 +451,7 @@ export default function SidebarSessionItem({
             <div
               className={cn(
                 'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
-                isSelected ? 'bg-primary/10' : 'bg-muted/50',
+                isSelected ? 'bg-primary/25' : 'bg-muted/50',
               )}
             >
               <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
@@ -448,7 +459,10 @@ export default function SidebarSessionItem({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <div
-                  className="min-w-0 flex-1 truncate text-sm font-normal text-foreground"
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-sm text-foreground',
+                    isSelected ? 'font-medium' : 'font-normal',
+                  )}
                   title={sessionView.sessionName}
                 >
                   {sessionView.sessionName}
