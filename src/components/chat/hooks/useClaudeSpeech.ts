@@ -198,8 +198,21 @@ export function useClaudeSpeech(
         }
       };
 
-      ws.onerror = () => onError?.('The dictation connection failed.');
+      ws.onerror = () => {
+        if (socket.current !== ws) {
+          return;
+        }
+        onError?.('The dictation connection failed.');
+      };
       ws.onclose = () => {
+        // Only this dictation's own socket may act here. A close arrives after
+        // the fact, and stopping and starting again straight away puts a new
+        // recording in place first - the old socket would then shut off the new
+        // microphone and drop its connection.
+        if (socket.current !== ws) {
+          return;
+        }
+
         // A connection that drops mid-recording would otherwise leave the
         // microphone running with nothing listening to it.
         cleanup();
