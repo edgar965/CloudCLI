@@ -469,9 +469,24 @@ export default function SidebarSessionItem({
                 ? 'border-green-500/30 bg-green-50/5 hover:bg-green-50/10 dark:bg-green-900/5 dark:hover:bg-green-900/10'
                 : 'hover:bg-accent/50',
           )}
-          // Left-click keeps in-app navigation; Ctrl/Cmd/middle-click and the
-          // native right-click menu use the href to open a new tab/window.
+          // Shift drags a text selection across half the list before the
+          // click ever arrives. Stopping it on mousedown keeps the click.
+          onMouseDown={(event) => {
+            if (event.shiftKey) event.preventDefault();
+          }}
+          // Ctrl/Cmd-click picks a row, shift-click the range up to it -
+          // the gesture every list uses. It has to preventDefault: the row
+          // is an <a>, and the browser's own meaning for those two keys is
+          // "open the href in a new tab", which lands on the login screen.
+          // A new tab is still reachable by middle-click and the right-click
+          // menu. Alt-click stays the browser's (download).
           onClick={(event) => {
+            if (selection && (event.metaKey || event.ctrlKey || event.shiftKey)) {
+              event.preventDefault();
+              window.getSelection()?.removeAllRanges();
+              selection.toggle(session.id, orderedSessionIds, event.shiftKey);
+              return;
+            }
             if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
             event.preventDefault();
             onSessionSelect(session, project.projectId);

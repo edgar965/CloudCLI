@@ -2,6 +2,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { api } from '../../../utils/api';
 
+import { applyPick } from './sessionPick';
+
 /**
  * Picking several sessions at once, to delete them in one go.
  *
@@ -46,34 +48,14 @@ export function useSessionSelection(onDeleted?: (ids: string[]) => void) {
    * @param shiftKey - Whether the range from the previous click is meant
    */
   const toggle = useCallback((id: string, orderedIds: string[], shiftKey = false) => {
-    setSelected((previous) => {
-      const next = new Set(previous);
-
-      const from = anchor.current;
-      if (shiftKey && from && from !== id) {
-        const start = orderedIds.indexOf(from);
-        const end = orderedIds.indexOf(id);
-        if (start >= 0 && end >= 0) {
-          const [lower, upper] = start < end ? [start, end] : [end, start];
-          // A range always adds. Removing a swathe is what "clear" is for, and
-          // a shift-click that silently unpicked half the list would be a
-          // worse surprise than one that picks a few too many.
-          for (const between of orderedIds.slice(lower, upper + 1)) {
-            next.add(between);
-          }
-          return next;
-        }
-      }
-
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-
+    // Read the anchor here, not inside the updater below: React runs updaters
+    // at render time, and the line after this one has already moved the
+    // anchor by then. Reading it late made every shift-range see itself as
+    // the anchor and fall back to picking the single row.
+    const from = anchor.current;
     anchor.current = id;
+
+    setSelected((previous) => applyPick(previous, { id, orderedIds, shiftKey, anchor: from }));
   }, []);
 
   /** Picks every session the list is showing, or drops them all. */
