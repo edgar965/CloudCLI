@@ -25,14 +25,39 @@ import WebSocket from 'ws';
  *   {"type": "TranscriptText", "data": "Dies ist ein Test der Spracherkennung von Claude Code."}
  *   {"type": "TranscriptEndpoint"}
  *
- * `data` is the whole transcript so far, not the newest words - each message
- * replaces the last. `TranscriptEndpoint` marks the end.
+ * `data` is the sentence being spoken, whole - each message replaces the last,
+ * it is not an addition. `TranscriptInterim` carries the same thing while it is
+ * still firming up.
+ *
+ * `TranscriptEndpoint` is NOT the end of the dictation, which is what it looked
+ * like from that one short recording: with `endpointing_ms=300` in the query it
+ * arrives after every pause in speech, and it means the sentence before it is
+ * settled. The next one starts from empty, so the settled ones have to be kept
+ * or everything said before a breath is lost.
+ *
+ * Two things this needs that a plain read of the stream does not show, both
+ * taken from the VS Code extension, which speaks the same protocol:
+ *
+ *   - `{"type":"KeepAlive"}` on open and every 8 s, or the upstream closes the
+ *     connection on its own.
+ *   - The recording ends when the socket closes after `CloseStream`, not on an
+ *     endpoint.
  *
  * This is an internal endpoint of Claude Code, not a documented API. It is
  * reached with the user's own Claude credentials and only when they ask for it.
  */
 
 const STREAM_PATH = '/api/ws/speech_to_text/voice_stream';
+/**
+ * How often the upstream wants to hear that we are still here.
+ *
+ * Checked against the VS Code extension, which sends one `KeepAlive` the
+ * moment the socket opens and then one every eight seconds. Without them the
+ * upstream closes on its own, and a close with nothing transcribed is what
+ * reached the user as "No speech detected".
+ */
+const KEEPALIVE_MS = 8_000;
+const KEEPALIVE = JSON.stringify({ type: 'KeepAlive' });
 /** Ceiling for audio held while connecting - about five minutes at 16 kHz mono. */
 const MAX_QUEUED_BYTES = 10 * 1024 * 1024;
 const DEFAULT_API_BASE = 'https://api.anthropic.com';
@@ -122,7 +147,43 @@ export class ClaudeSpeechStream {
    */
   private heardUpstream = false;
 
+  /** Keeps the upstream from closing the connection under us. */
+  private keepAlive: NodeJS.Timeout | null = null;
+
+  /**
+   * Sentences the upstream has finished with.
+   *
+   * `TranscriptEndpoint` does not mean the dictation is over - it means one
+   * sentence is settled, and with `endpointing_ms=300` it arrives after every
+   * short pause in speech. Treating it as the end cut the recording off at the
+   * first breath. What it actually marks is the point where the text so far
+   * stops changing, so it moves here and the next sentence starts fresh.
+   */
+  private committed = '';
+
+  /** The sentence being transcribed right now; every message replaces it. */
+  private pending = '';
+
   constructor(private readonly events: SpeechEvents) {}
+
+  /** Everything settled so far, plus the sentence still being spoken. */
+  private wholeTranscript(): string {
+    if (!this.committed) {
+      return this.pending;
+    }
+    return this.pending ? `${this.committed} ${this.pending}` : this.committed;
+  }
+
+  /** Moves the sentence in progress into the settled text and reports it. */
+  private settlePending(): void {
+    if (!this.pending) {
+      return;
+    }
+
+    this.committed = this.wholeTranscript();
+    this.pending = '';
+    this.events.onTranscript(this.committed);
+  }
 
   /** The end is reported once, whichever of the two says so first. */
   private emitEnd(): void {
@@ -184,6 +245,17 @@ export class ClaudeSpeechStream {
       }
       this.queued = [];
       this.queuedBytes = 0;
+
+      // One straight away, then on the clock - the upstream closes a stream it
+      // has not heard from.
+      socket.send(KEEPALIVE);
+      this.keepAlive = setInterval(() => {
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(KEEPALIVE);
+        }
+      }, KEEPALIVE_MS);
+      this.keepAlive.unref?.();
+
       if (this.finishQueued) {
         this.finishQueued = false;
         socket.send('{"type":"CloseStream"}');
@@ -193,6 +265,12 @@ export class ClaudeSpeechStream {
     socket.on('error', (error: Error) => this.events.onError(error.message));
     socket.on('close', (code: number, reason: Buffer) => {
       this.upstream = null;
+      this.stopKeepAlive();
+
+      // Whatever was still being spoken when the line went down is the last
+      // thing the user said - it belongs in the transcript, not dropped.
+      this.settlePending();
+
       if (this.closing) {
         return;
       }
@@ -219,14 +297,32 @@ export class ClaudeSpeechStream {
   private handleMessage(text: string): void {
     try {
       const message = JSON.parse(text) as { type?: string; data?: unknown };
-      if (message.type === 'TranscriptText' && typeof message.data === 'string') {
+      // Interim and final text arrive under two names and mean the same thing
+      // here: the sentence in progress, whole, replacing what came before.
+      if (
+        (message.type === 'TranscriptText' || message.type === 'TranscriptInterim')
+        && typeof message.data === 'string'
+      ) {
         this.heardUpstream = true;
-        this.events.onTranscript(message.data);
+        this.pending = message.data;
+        this.events.onTranscript(this.wholeTranscript());
         return;
       }
+
       if (message.type === 'TranscriptEndpoint') {
         this.heardUpstream = true;
-        this.emitEnd();
+        this.settlePending();
+        return;
+      }
+
+      // The upstream's own failures, which used to fall through to the
+      // catch-all below and vanish.
+      if (message.type === 'TranscriptError' || message.type === 'error') {
+        const detail = typeof message.data === 'string'
+          ? message.data
+          : (message as { description?: string; message?: string }).description
+            ?? (message as { message?: string }).message;
+        this.events.onError(detail || 'The dictation service reported an error.');
       }
     } catch {
       // Anything that is not json is not ours to interpret.
@@ -262,9 +358,18 @@ export class ClaudeSpeechStream {
 
   close(): void {
     this.closing = true;
+    this.stopKeepAlive();
     this.queued = [];
     this.queuedBytes = 0;
     this.upstream?.close();
     this.upstream = null;
+  }
+
+  /** A timer that outlives its socket would keep sending into nothing. */
+  private stopKeepAlive(): void {
+    if (this.keepAlive) {
+      clearInterval(this.keepAlive);
+      this.keepAlive = null;
+    }
   }
 }
