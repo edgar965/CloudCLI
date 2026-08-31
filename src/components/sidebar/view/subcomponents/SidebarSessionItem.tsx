@@ -73,6 +73,16 @@ export default function SidebarSessionItem({
   const rowRef = useRef<HTMLDivElement>(null);
   const selection = useSelectionContext();
   const isPicked = Boolean(selection?.isSelected(session.id));
+  /**
+   * Whether the list is being picked over rather than navigated.
+   *
+   * Once one conversation is picked, a plain click on any row picks it too.
+   * Hitting a 20px mark thirty times is not a way to select thirty
+   * conversations, and the mark is easy to miss entirely - the first
+   * attempt at this opened chats instead, which looks exactly like "only
+   * the last one gets selected".
+   */
+  const isPicking = Boolean(selection && selection.selectedCount > 0);
   const [isMobileOptionsOpen, setIsMobileOptionsOpen] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const [providerSessionId, setProviderSessionId] = useState<string | null>(null);
@@ -487,6 +497,11 @@ export default function SidebarSessionItem({
               selection.toggle(session.id, orderedSessionIds, event.shiftKey);
               return;
             }
+            if (selection && isPicking) {
+              event.preventDefault();
+              selection.toggle(session.id, orderedSessionIds, false);
+              return;
+            }
             if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
             event.preventDefault();
             onSessionSelect(session, project.projectId);
@@ -515,7 +530,7 @@ export default function SidebarSessionItem({
                 selection.toggle(session.id, orderedSessionIds, event.shiftKey);
               }}
               className={cn(
-                'group/pick flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
+                'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
                 selection && 'cursor-pointer',
                 isPicked
                   ? 'bg-primary text-primary-foreground'
@@ -524,13 +539,17 @@ export default function SidebarSessionItem({
             >
               {isPicked ? (
                 <Check className="h-3 w-3" />
+              ) : isPicking ? (
+                // While picking, every row shows its box - otherwise there is
+                // no sign that a click now picks instead of opening.
+                <Square className="h-3 w-3" />
               ) : (
                 <>
                   <LLMProviderLogo
                     provider={session.__provider}
-                    className={cn('h-3 w-3', selection && 'group-hover/pick:hidden')}
+                    className={cn('h-3 w-3', selection && 'group-hover:hidden')}
                   />
-                  {selection && <Square className="hidden h-3 w-3 group-hover/pick:block" />}
+                  {selection && <Square className="hidden h-3 w-3 group-hover:block" />}
                 </>
               )}
             </span>
