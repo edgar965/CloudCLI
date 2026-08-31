@@ -244,5 +244,9 @@
   },
   "tasks": {
     "nextTaskPrompt": "Start the next task"
+  },
+  "context": {
+    "used": "{{percent}}% context · {{used}}/{{max}}",
+    "nearlyFull": "{{percent}}% context — compacting soon"
   }
 }

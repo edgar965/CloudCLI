@@ -236,5 +236,9 @@
   },
   "tasks": {
     "nextTaskPrompt": "开始下一个任务"
+  },
+  "context": {
+    "used": "上下文 {{percent}}% · {{used}}/{{max}}",
+    "nearlyFull": "上下文 {{percent}}% — 即将压缩"
   }
 }

@@ -217,5 +217,9 @@
   },
   "tasks": {
     "nextTaskPrompt": "Commencer la prochaine tâche"
+  },
+  "context": {
+    "used": "{{percent}} % du contexte · {{used}}/{{max}}",
+    "nearlyFull": "{{percent}} % du contexte — compactage imminent"
   }
 }

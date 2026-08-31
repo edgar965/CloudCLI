@@ -24,6 +24,7 @@ interface UseChatRealtimeHandlersArgs {
   selectedSession: ProjectSession | null;
   currentSessionId: string | null;
   setTokenBudget: (budget: Record<string, unknown> | null) => void;
+  setContextUsage: (usage: Record<string, unknown> | null) => void;
   pendingPermissionRequests: PendingPermissionRequest[];
   setPendingPermissionRequests: Dispatch<SetStateAction<PendingPermissionRequest[]>>;
   streamTimerRef: MutableRefObject<number | null>;
@@ -64,6 +65,7 @@ export function useChatRealtimeHandlers({
   selectedSession,
   currentSessionId,
   setTokenBudget,
+  setContextUsage,
   pendingPermissionRequests,
   setPendingPermissionRequests,
   streamTimerRef,
@@ -317,6 +319,9 @@ export function useChatRealtimeHandlers({
         case 'status': {
           if (msg.text === 'token_budget' && msg.tokenBudget) {
             setTokenBudget(msg.tokenBudget as Record<string, unknown>);
+          } else if (msg.text === 'context_usage' && msg.contextUsage) {
+            // How full the window is, as the CLI itself reports it.
+            setContextUsage(msg.contextUsage as Record<string, unknown>);
           } else if (msg.text && sid) {
             onSessionProcessing?.(sid, {
               statusText: msg.text as string,
@@ -340,6 +345,7 @@ export function useChatRealtimeHandlers({
     selectedSession,
     currentSessionId,
     setTokenBudget,
+    setContextUsage,
     pendingPermissionRequests,
     setPendingPermissionRequests,
     streamTimerRef,

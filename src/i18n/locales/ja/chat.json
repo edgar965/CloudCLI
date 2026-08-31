@@ -202,5 +202,9 @@
     "providers": {
       "assistant": "Assistant"
     }
+  },
+  "context": {
+    "used": "コンテキスト {{percent}}% · {{used}}/{{max}}",
+    "nearlyFull": "コンテキスト {{percent}}% — まもなく圧縮されます"
   }
 }

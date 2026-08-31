@@ -236,5 +236,9 @@
   },
   "tasks": {
     "nextTaskPrompt": "다음 작업 시작"
+  },
+  "context": {
+    "used": "컨텍스트 {{percent}}% · {{used}}/{{max}}",
+    "nearlyFull": "컨텍스트 {{percent}}% — 곧 압축됩니다"
   }
 }

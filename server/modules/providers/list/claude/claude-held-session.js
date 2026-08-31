@@ -157,6 +157,10 @@ export class HeldClaudeSession {
    * The options object comes along because the callbacks built into it read
    * from it at call time; keeping the reference is what lets a later turn
    * correct what they see.
+   *
+   * @param {Object} instance - The started SDK query
+   * @param {() => void} release - Closes stdin so the CLI can exit
+   * @param {Record<string, unknown>|null} [sdkOptions] - The options it was started with
    */
   start(instance, release, sdkOptions = null) {
     this.instance = instance;

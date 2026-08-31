@@ -215,5 +215,9 @@
   },
   "tasks": {
     "nextTaskPrompt": "Начать следующую задачу"
+  },
+  "context": {
+    "used": "Контекст {{percent}} % · {{used}}/{{max}}",
+    "nearlyFull": "Контекст {{percent}} % — скоро сжатие"
   }
 }

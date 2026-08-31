@@ -42,6 +42,7 @@ import TokenUsageSummary from './TokenUsageSummary';
 import QueuedMessageCard from './QueuedMessageCard';
 import ComposerModelMenu from './ComposerModelMenu';
 import ComposerPermissionMenu from './ComposerPermissionMenu';
+import ContextMeter, { type ContextUsage } from './ContextMeter';
 
 interface MentionableFile {
   name: string;
@@ -80,6 +81,7 @@ interface ChatComposerProps {
   onSelectModel: (model: string) => void;
   modelsLoading: boolean;
   tokenBudget: Record<string, unknown> | null;
+  contextUsage: Record<string, unknown> | null;
   onShowTokenUsage: () => void;
   onToggleCommandMenu: () => void;
   hasInput: boolean;
@@ -143,6 +145,7 @@ export default function ChatComposer({
   onSelectModel,
   modelsLoading,
   tokenBudget,
+  contextUsage,
   onShowTokenUsage,
   onToggleCommandMenu,
   hasInput,
@@ -407,6 +410,8 @@ export default function ChatComposer({
           )}
 
           <input {...getInputProps()} />
+
+        <ContextMeter usage={contextUsage as ContextUsage | null} />
 
         <PromptInputFooter className="border-b border-t-0">
           <PromptInputTools className="shrink-0">

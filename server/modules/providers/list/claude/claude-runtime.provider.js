@@ -844,6 +844,48 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
 
     // Process streaming messages
     console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
+    /**
+     * Asks the running process how full the context is and passes it on.
+     *
+     * The numbers come from the CLI itself (`getContextUsage`), not from an
+     * estimate: how much of the window is in use, where the limit sits, and
+     * what it is made of - system prompt, tools, memory files, mcp tools, the
+     * conversation. It is asked at the start of a turn, while the process is
+     * certainly alive; asking after `result` would race the shutdown.
+     */
+    const reportContextUsage = async () => {
+      try {
+        const usage = await queryInstance?.getContextUsage?.();
+        if (!usage || typeof usage.totalTokens !== 'number') {
+          return;
+        }
+
+        ws.send(createNormalizedMessage({
+          kind: 'status',
+          text: 'context_usage',
+          contextUsage: {
+            used: usage.totalTokens,
+            max: usage.maxTokens,
+            rawMax: usage.rawMaxTokens,
+            percentage: usage.percentage,
+            model: usage.model,
+            categories: Array.isArray(usage.categories)
+              ? usage.categories.map((entry) => ({
+                name: entry.name,
+                tokens: entry.tokens,
+                color: entry.color,
+              }))
+              : [],
+          },
+          sessionId: capturedSessionId || sessionId || null,
+          provider: 'claude',
+        }));
+      } catch {
+        // An older CLI without the control request, or a process already gone:
+        // the display simply keeps its last value.
+      }
+    };
+
     // One SDK message, handled the same way whichever process delivered it:
     // a fresh query, or one held open across the turns of this conversation.
     const handleTurnMessage = (message) => {
@@ -885,6 +927,10 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       const tokenBudgetData = extractTokenBudget(message);
       if (tokenBudgetData) {
         ws.send(createNormalizedMessage({ kind: 'status', text: 'token_budget', tokenBudget: tokenBudgetData, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+      }
+
+      if (message.type === 'system' && message.subtype === 'init') {
+        void reportContextUsage();
       }
 
       if (startsBackgroundWork(message)) {

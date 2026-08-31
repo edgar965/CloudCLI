@@ -108,6 +108,8 @@ function ChatInterface({
     setIsUserScrolledUp,
     tokenBudget,
     setTokenBudget,
+    contextUsage,
+    setContextUsage,
     visibleMessageCount,
     visibleMessages,
     loadEarlierMessages,
@@ -245,6 +247,7 @@ function ChatInterface({
     selectedSession,
     currentSessionId,
     setTokenBudget,
+    setContextUsage,
     pendingPermissionRequests,
     setPendingPermissionRequests,
     streamTimerRef,
@@ -422,6 +425,7 @@ function ChatInterface({
           onSelectModel={handleSelectComposerModel}
           modelsLoading={providerModelsLoading}
           tokenBudget={tokenBudget}
+          contextUsage={contextUsage}
           onShowTokenUsage={showCostModal}
           onToggleCommandMenu={handleToggleCommandMenu}
           hasInput={Boolean(input.trim())}

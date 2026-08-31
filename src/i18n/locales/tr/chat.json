@@ -215,5 +215,9 @@
   },
   "tasks": {
     "nextTaskPrompt": "Sonraki görevi başlat"
+  },
+  "context": {
+    "used": "Bağlam %{{percent}} · {{used}}/{{max}}",
+    "nearlyFull": "Bağlam %{{percent}} — birazdan sıkıştırılacak"
   }
 }

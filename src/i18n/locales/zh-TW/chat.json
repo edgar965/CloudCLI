@@ -251,5 +251,9 @@
   },
   "tasks": {
     "nextTaskPrompt": "開始下一個任務"
+  },
+  "context": {
+    "used": "上下文 {{percent}}% · {{used}}/{{max}}",
+    "nearlyFull": "上下文 {{percent}}% — 即將壓縮"
   }
 }

@@ -215,5 +215,9 @@
   },
   "tasks": {
     "nextTaskPrompt": "Inizia l'attività successiva"
+  },
+  "context": {
+    "used": "{{percent}}% del contesto · {{used}}/{{max}}",
+    "nearlyFull": "{{percent}}% del contesto: compattazione imminente"
   }
 }
