@@ -68,7 +68,7 @@ function socketUrl(): string {
 }
 
 export function useClaudeSpeech(
-  onTranscript: (text: string, send?: boolean) => void,
+  onTranscript: (text: string, send?: boolean, final?: boolean) => void,
   onError?: (message: string) => void,
 ) {
   const [state, setState] = useState<ClaudeSpeechState>('idle');
@@ -167,8 +167,13 @@ export function useClaudeSpeech(
         }
 
         if (message.type === 'transcript' && typeof message.text === 'string') {
-          // Each message is the full transcript, not an addition.
+          // Each message is the full transcript, not an addition - and it goes
+          // straight into the box, the way the VS Code extension does it.
+          // Holding it back until the end is what made dictation look like it
+          // had stopped working: nothing on screen while speaking, then all of
+          // it at once, if the end arrived at all.
           transcript.current = message.text;
+          onTranscript(message.text, false, false);
           return;
         }
         if (message.type === 'error') {
@@ -187,7 +192,7 @@ export function useClaudeSpeech(
           finished.current = true;
           const text = transcript.current.trim();
           if (text) {
-            onTranscript(text, sendOnEnd.current);
+            onTranscript(text, sendOnEnd.current, true);
           } else {
             onError?.('No speech detected');
           }

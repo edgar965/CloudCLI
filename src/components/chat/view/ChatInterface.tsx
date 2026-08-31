@@ -181,6 +181,7 @@ function ChatInterface({
     editQueuedDraft,
     deleteQueuedDraft,
     handleVoiceTranscript,
+    sendCompact,
     handleInputChange,
     handleKeyDown,
     handlePaste,
@@ -427,7 +428,6 @@ function ChatInterface({
           onSelectModel={handleSelectComposerModel}
           modelsLoading={providerModelsLoading}
           tokenBudget={tokenBudget}
-          contextUsage={contextUsage}
           onShowTokenUsage={showCostModal}
           onToggleCommandMenu={handleToggleCommandMenu}
           hasInput={Boolean(input.trim())}
@@ -487,6 +487,8 @@ function ChatInterface({
         activeProviderModel={currentProviderModel}
         currentSessionId={currentSessionId || selectedSession?.id || null}
         onSelectProviderModel={selectProviderModel}
+        contextUsage={contextUsage}
+        onCompact={sendCompact}
       />
     </PermissionContext.Provider>
   );

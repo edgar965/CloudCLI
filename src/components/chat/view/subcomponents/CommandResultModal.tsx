@@ -14,6 +14,7 @@ import {
   TerminalSquare,
   Timer,
   Loader2,
+  Minimize2,
   X,
 } from 'lucide-react';
 
@@ -32,9 +33,14 @@ import type {
   StatusCommandData,
 } from '../../hooks/useChatComposerState';
 
+import ContextMeter, { type ContextUsage } from './ContextMeter';
 import ModelLibraryPanel from './ModelLibraryPanel';
 
 type CommandResultModalProps = {
+  /** What the cli reports about its context window, when it has said. */
+  contextUsage?: Record<string, unknown> | null;
+  /** Sends `/compact`; without it the button stays away. */
+  onCompact?: () => void;
   payload: CommandModalPayload | null;
   onClose: () => void;
   providerModelCatalog: Partial<Record<LLMProvider, ProviderModelsDefinition>>;
@@ -534,6 +540,8 @@ function StatusContent({ data }: { data: StatusCommandData }) {
 export default function CommandResultModal({
   payload,
   onClose,
+  contextUsage,
+  onCompact,
   providerModelCatalog,
   providerModelActions,
   activeProvider,
@@ -631,7 +639,15 @@ export default function CommandResultModal({
               onSelectProviderModel={onSelectProviderModel}
             />
           )}
-          {payload?.kind === 'cost' && <CostContent data={payload.data as CostCommandData} />}
+          {payload?.kind === 'cost' && (
+            <>
+              <CostContent data={payload.data as CostCommandData} />
+              {/* What the cli reports about its own window, next to what
+                  this session has spent - the two answer different
+                  questions and only one of them can be acted on. */}
+              <ContextMeter usage={(contextUsage as ContextUsage | null) ?? null} />
+            </>
+          )}
           {payload?.kind === 'status' && <StatusContent data={payload.data as StatusCommandData} />}
         </div>
 
@@ -640,9 +656,29 @@ export default function CommandResultModal({
             <Gauge className="h-3.5 w-3.5" />
             <span>Esc closes the modal.</span>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={onClose} className="rounded-xl">
-            Close
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* The moment someone looks at token usage is the moment compacting
+                becomes the question, so the answer is here rather than a
+                command to remember. */}
+            {payload?.kind === 'cost' && onCompact && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+                onClick={() => {
+                  onCompact();
+                  onClose();
+                }}
+              >
+                <Minimize2 className="mr-1.5 h-3.5 w-3.5" />
+                Compact conversation
+              </Button>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={onClose} className="rounded-xl">
+              Close
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

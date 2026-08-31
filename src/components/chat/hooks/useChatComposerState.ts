@@ -409,6 +409,23 @@ export function useChatComposerState({
     }, 0);
   }, [addMessage]);
 
+  /**
+   * Compacts the conversation.
+   *
+   * `/compact` is the cli's own command, so it goes out as the message it is
+   * and the cli does the work - the same path a typed one takes. Worth a
+   * button because the point at which it is needed is the point at which the
+   * window is nearly full, and that is shown, not typed.
+   */
+  const sendCompact = useCallback(() => {
+    setInput('/compact');
+    inputValueRef.current = '/compact';
+    // Next tick, so the box shows the command before it is dispatched.
+    setTimeout(() => {
+      handleSubmitRef.current?.(createFakeSubmitEvent());
+    }, 0);
+  }, [setInput]);
+
   const executeCommand = useCallback(
     async (command: SlashCommand, rawInput?: string, options?: { preserveInput?: boolean }) => {
       if (!command || !selectedProject) {
@@ -1090,14 +1107,40 @@ export function useChatComposerState({
     setQueuedDraft(null);
   }, []);
 
-  // A voice transcript either fills the input (to edit before sending) or, when the
-  // user tapped "stop and send", is submitted straight away. Mirror the value into
-  // inputValueRef synchronously so handleSubmit reads the new text, not the stale state.
-  const handleVoiceTranscript = useCallback((text: string, send?: boolean) => {
-    const base = inputValueRef.current.trim();
+  /**
+   * What was in the box when this dictation started.
+   *
+   * The transcript arrives again and again while someone speaks, each time as
+   * the whole thing rather than the newest words. Appending every one of those
+   * would repeat the sentence on screen, so each update replaces the last -
+   * and this is what it replaces back to.
+   */
+  const voiceBase = useRef<string | null>(null);
+
+  /**
+   * Puts the running transcript in the box, the way the VS Code extension
+   * does: while speaking, not once at the end. Waiting for the end is what
+   * made dictation feel like it had stopped working - nothing happened until
+   * everything happened.
+   *
+   * `final` closes the dictation off, so the next one starts from what is in
+   * the box by then. The other two dictation paths report once, at the end, so
+   * leaving it out means exactly that. Mirrored into `inputValueRef`
+   * synchronously, or a send would read the text from before this update.
+   */
+  const handleVoiceTranscript = useCallback((text: string, send?: boolean, final = true) => {
+    if (voiceBase.current === null) {
+      voiceBase.current = inputValueRef.current.trim();
+    }
+
+    const base = voiceBase.current;
     const next = base ? `${base} ${text}` : text;
     setInput(next);
     inputValueRef.current = next;
+
+    if (final) {
+      voiceBase.current = null;
+    }
     if (send) handleSubmitRef.current?.(createFakeSubmitEvent());
   }, [setInput]);
 
@@ -1374,6 +1417,7 @@ export function useChatComposerState({
     editQueuedDraft,
     deleteQueuedDraft,
     handleVoiceTranscript,
+    sendCompact,
     handleInputChange,
     handleKeyDown,
     handlePaste,

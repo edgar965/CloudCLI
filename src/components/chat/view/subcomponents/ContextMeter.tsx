@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '../../../../lib/utils';
 
 /**
- * How full the model's context window is, above the message box.
+ * How full the model's context window is - and the way to do something about
+ * it.
  *
  * The numbers come from the CLI itself (`getContextUsage`), not from adding up
  * what went over the wire: how much of the window is in use, where the limit
@@ -13,8 +14,9 @@ import { cn } from '../../../../lib/utils';
  *   System prompt 6,952 · System tools 22,257 · Memory files 10,101
  *   Skills 2,043 · Messages 3,506 · Free space 155,141
  *
- * Worth seeing, because most of a fresh window is gone before the first
- * message: instruction files and tool descriptions, not the conversation.
+ * A button rather than a readout: knowing the window is nearly full is only
+ * half of it, and the other half - compacting the conversation - was a command
+ * to remember and type. Clicking this sends `/compact`.
  */
 
 export type ContextUsage = {
@@ -43,7 +45,14 @@ const formatTokens = (value: number): string => {
   return String(Math.round(value));
 };
 
-export default function ContextMeter({ usage }: { usage: ContextUsage | null }) {
+type Props = {
+  usage: ContextUsage | null;
+  /** Sends `/compact`; without it the button is only a readout. */
+  onCompact?: () => void;
+  disabled?: boolean;
+};
+
+export default function ContextMeter({ usage, onCompact, disabled }: Props) {
   const { t } = useTranslation('chat');
 
   if (!usage || !Number.isFinite(usage.percentage) || !usage.max) {
@@ -65,40 +74,55 @@ export default function ContextMeter({ usage }: { usage: ContextUsage | null }) 
     .map((entry) => `${entry.name}: ${entry.tokens.toLocaleString()}`)
     .join('\n');
 
-  return (
-    <div
-      className="flex items-center gap-2 px-3 pt-2 text-[11px] text-muted-foreground"
-      title={breakdown || undefined}
-    >
-      <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn(
-            'h-full rounded-full transition-all duration-300',
-            level === 'critical' ? 'bg-red-500' : level === 'warn' ? 'bg-amber-500' : 'bg-primary/50',
-          )}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+  const title = [
+    t('context.title', {
+      used: usage.used.toLocaleString(),
+      max: usage.max.toLocaleString(),
+      defaultValue: '{{used}} of {{max}} tokens in the context window',
+    }),
+    breakdown,
+    onCompact
+      ? t('context.compactHint', {
+        defaultValue: 'Click to compact the conversation (/compact)',
+      })
+      : '',
+  ].filter(Boolean).join('\n\n');
 
-      <span
-        className={cn(
-          'flex-shrink-0 tabular-nums',
-          level === 'critical'
-            ? 'font-medium text-red-600 dark:text-red-400'
-            : level === 'warn'
-              ? 'text-amber-600 dark:text-amber-400'
-              : 'text-muted-foreground/70',
-        )}
-      >
-        {level === 'critical'
-          ? t('context.nearlyFull', { percent, defaultValue: '{{percent}}% context — compacting soon' })
-          : t('context.used', {
-            percent,
-            used: formatTokens(usage.used),
-            max: formatTokens(usage.max),
-            defaultValue: '{{percent}}% context · {{used}}/{{max}}',
-          })}
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled || !onCompact}
+      onClick={onCompact}
+      className={cn(
+        'flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium tabular-nums transition-colors',
+        'disabled:cursor-default disabled:opacity-70',
+        level === 'critical'
+          ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400'
+          : level === 'warn'
+            ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400'
+            : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+      )}
+    >
+      {/* A ring that fills up: the number says how much, this says it faster. */}
+      <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 -rotate-90" aria-hidden="true">
+        <circle cx="10" cy="10" r="8" fill="none" strokeWidth="4" className="stroke-current opacity-20" />
+        <circle
+          cx="10"
+          cy="10"
+          r="8"
+          fill="none"
+          strokeWidth="4"
+          className="stroke-current"
+          strokeDasharray={`${(percent / 100) * 50.27} 50.27`}
+        />
+      </svg>
+      <span>
+        {t('context.percent', { percent, defaultValue: '{{percent}}%' })}
       </span>
-    </div>
+      <span className="hidden text-muted-foreground/70 sm:inline">
+        {formatTokens(usage.used)}/{formatTokens(usage.max)}
+      </span>
+    </button>
   );
 }
