@@ -1,3 +1,7 @@
+import { readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
 import Database from 'better-sqlite3';
 
 import { sessionsDb } from '@/modules/database/index.js';
@@ -118,6 +122,100 @@ export const OPENCODE_PREDEFINED_MODELS: ProviderModelsDefinition = {
   DEFAULT: 'opencode/gpt-5.6-terra',
 };
 
+/** Global OpenCode config files, in the order the CLI loads them. */
+const OPENCODE_CONFIG_FILES = ['config.json', 'opencode.json', 'opencode.jsonc'];
+
+/** Provider API keys OpenCode reads straight from the environment. */
+const OPENCODE_ENV_PROVIDER_IDS: Record<string, string> = {
+  OPENCODE_API_KEY: 'opencode',
+  ANTHROPIC_API_KEY: 'anthropic',
+  OPENAI_API_KEY: 'openai',
+};
+
+const readOpenCodeJsonFile = async (filePath: string): Promise<Record<string, unknown> | null> => {
+  try {
+    return readObjectRecord(JSON.parse(await readFile(filePath, 'utf8')));
+  } catch {
+    // Missing, unreadable, or comment-bearing (.jsonc) files simply contribute
+    // nothing; the auth store is the authoritative source below.
+    return null;
+  }
+};
+
+/**
+ * Lists the upstream providers this OpenCode install can actually route to.
+ *
+ * OpenCode resolves `<providerID>/<modelID>` against the providers the user has
+ * connected, and rejects anything else outright - `Model
+ * opencode/claude-sonnet-4-6 is not valid` is what a run gets for asking for an
+ * OpenCode Zen model on a machine that only has an Anthropic key. The curated
+ * catalog spans every provider OpenCode can address, so it has to be narrowed
+ * to this machine's providers before it reaches the model picker.
+ *
+ * Returns null when nothing can be read, so the caller keeps the full catalog
+ * rather than leaving the picker empty. Providers declared only in a
+ * project-level `opencode.json` are not visible here; the null fallback and the
+ * env-key sweep keep those installs on the full list.
+ */
+const readConnectedOpenCodeProviderIds = async (): Promise<Set<string> | null> => {
+  const providerIds = new Set<string>();
+  const configDir = path.join(os.homedir(), '.config', 'opencode');
+
+  const auth = await readOpenCodeJsonFile(
+    path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json'),
+  );
+  for (const [providerId, credential] of Object.entries(auth ?? {})) {
+    if (readObjectRecord(credential)) {
+      providerIds.add(providerId);
+    }
+  }
+
+  for (const configFile of OPENCODE_CONFIG_FILES) {
+    const config = await readOpenCodeJsonFile(path.join(configDir, configFile));
+    for (const providerId of Object.keys(readObjectRecord(config?.provider) ?? {})) {
+      providerIds.add(providerId);
+    }
+  }
+
+  for (const [envKey, providerId] of Object.entries(OPENCODE_ENV_PROVIDER_IDS)) {
+    if (readOptionalString(process.env[envKey])) {
+      providerIds.add(providerId);
+    }
+  }
+
+  return providerIds.size > 0 ? providerIds : null;
+};
+
+/**
+ * Narrows the curated catalog to the providers OpenCode can route to.
+ *
+ * The default has to move with the list: leaving it on an OpenCode Zen model
+ * would hand every new session a model the CLI refuses to run.
+ */
+const filterOpenCodeModelsByProvider = (
+  definition: ProviderModelsDefinition,
+  connectedProviderIds: Set<string> | null,
+): ProviderModelsDefinition => {
+  if (!connectedProviderIds) {
+    return definition;
+  }
+
+  const options = definition.OPTIONS.filter(
+    (option) => connectedProviderIds.has(option.value.split('/')[0]),
+  );
+  if (options.length === 0) {
+    return definition;
+  }
+
+  return {
+    ...definition,
+    OPTIONS: options,
+    DEFAULT: options.some((option) => option.value === definition.DEFAULT)
+      ? definition.DEFAULT
+      : options[0].value,
+  };
+};
+
 const parseOpenCodeSessionModelValue = (rawModel: unknown): string | null => {
   if (typeof rawModel === 'string') {
     const trimmed = rawModel.trim();
@@ -147,30 +245,39 @@ const parseOpenCodeSessionModelValue = (rawModel: unknown): string | null => {
 /** Provider registry model adapter for OpenCode predefined models and session metadata. */
 export class OpenCodeProviderModels implements IProviderModels {
   /**
-   * The curated catalog plus the models declared in the local OpenCode config.
+   * The curated catalog, narrowed to the providers this machine is logged in
+   * to, plus the models declared in the local OpenCode config.
    *
    * A provider the user configures themselves - a local Ollama, an OpenRouter
    * key, an internal gateway - is not in any published catalog, so its models
    * cannot be listed here without reading that config. Without one, or with
-   * nothing new in it, the catalog is exactly what it was.
+   * nothing new in it, the catalog is exactly what the filter returned.
    */
   async getSupportedModels(): Promise<ProviderModelsDefinition> {
+    const connected = filterOpenCodeModelsByProvider(
+      OPENCODE_PREDEFINED_MODELS,
+      await readConnectedOpenCodeProviderIds(),
+    );
+
+    // Added after the filter, never before it: a provider written into the
+    // config by hand is not one OpenCode reports as connected, so filtering
+    // afterwards would throw away exactly the models only the config knows.
     const configuredModels = await readConfiguredOpenCodeModels();
-    const known = new Set(OPENCODE_PREDEFINED_MODELS.OPTIONS.map((option) => option.value));
+    const known = new Set(connected.OPTIONS.map((option) => option.value));
     const additions = configuredModels.filter((option) => !known.has(option.value));
     if (additions.length === 0) {
-      return OPENCODE_PREDEFINED_MODELS;
+      return connected;
     }
 
     return {
-      ...OPENCODE_PREDEFINED_MODELS,
-      OPTIONS: [...OPENCODE_PREDEFINED_MODELS.OPTIONS, ...additions],
+      ...connected,
+      OPTIONS: [...connected.OPTIONS, ...additions],
     };
   }
 
   async getCurrentActiveModel(sessionId?: string): Promise<ProviderCurrentActiveModel> {
     if (!sessionId?.trim()) {
-      return buildDefaultProviderCurrentActiveModel(OPENCODE_PREDEFINED_MODELS);
+      return buildDefaultProviderCurrentActiveModel(await this.getSupportedModels());
     }
 
     // OpenCode's `session` table is keyed by its own session id, so the stable
@@ -217,6 +324,6 @@ export class OpenCodeProviderModels implements IProviderModels {
       // Fall through to the curated default when OpenCode session lookup fails.
     }
 
-    return buildDefaultProviderCurrentActiveModel(OPENCODE_PREDEFINED_MODELS);
+    return buildDefaultProviderCurrentActiveModel(await this.getSupportedModels());
   }
 }

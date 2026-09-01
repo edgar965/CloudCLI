@@ -99,7 +99,10 @@ test('a second turn cannot touch a process that is already serving one', async (
   const sdkOptions = { permissionMode: 'default', allowedTools: [] as string[] };
   const session = new HeldClaudeSession({ sessionKey: 'session-7', fingerprint: fingerprint() });
 
-  // A query that answers nothing, so the first turn stays open.
+  // A query that answers nothing, so the first turn stays open. It yields
+  // nothing on purpose - that is the whole fixture - so require-yield has to
+  // step aside here rather than be satisfied with unreachable code.
+  // eslint-disable-next-line require-yield
   const idle = (async function* () {
     for await (const _message of session.promptStream()) {
       // The turn never gets its `result`.
