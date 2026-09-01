@@ -240,6 +240,24 @@ export class ViewHost {
       },
     });
     this.configureChildWebContents(view.webContents);
+
+    // Every load of a local page, not only the one that opened the tab. The
+    // web UI reads its token at startup, so a view that reloads - a manual
+    // refresh, a navigation inside the app, the reload this very sync
+    // triggers - would otherwise come back to an empty slot and show the
+    // login screen even though the machine is logged in.
+    view.webContents.on('did-finish-load', () => {
+      const url = view.webContents.getURL();
+      if (!url.startsWith('http')) {
+        return;
+      }
+      void syncSharedUiToken(view.webContents).then((received) => {
+        if (received && !view.webContents.isDestroyed()) {
+          view.webContents.reload();
+        }
+      });
+    });
+
     this.tabViews.set(tabId, view);
     return view;
   }
