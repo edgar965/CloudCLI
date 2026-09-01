@@ -45,6 +45,8 @@ type ProjectActiveSessionState = {
 type ProjectsStateProviderProps = {
   children: ReactNode;
   sessionId?: string;
+  /** Still URL-encoded path from `/project/:projectPath`, how a launcher opens a folder. */
+  projectPath?: string;
   navigate: NavigateFunction;
   subscribe: (listener: (event: ServerEvent) => void) => () => void;
   isMobile: boolean;
@@ -61,6 +63,7 @@ const ProjectActiveSessionContext = createContext<ProjectActiveSessionState | nu
 export function ProjectsStateProvider({
   children,
   sessionId,
+  projectPath,
   navigate,
   subscribe,
   isMobile,
@@ -68,6 +71,7 @@ export function ProjectsStateProvider({
 }: ProjectsStateProviderProps) {
   const state = useProjectsState({
     sessionId,
+    projectPath,
     navigate,
     subscribe,
     isMobile,

@@ -14,7 +14,7 @@ import { readSelectedProvider } from '@/shared/selectedProvider';
 type UseProjectsStateArgs = {
   sessionId?: string;
   /**
-   * Project path from the `/project/:projectPath` route, still URL-encoded.
+   * Project path from the `/project/:projectPath` route, decoded by the router.
    * Selects that project once, as soon as the project list has loaded.
    */
   projectPath?: string;
@@ -731,12 +731,10 @@ export function useProjectsState({
       return;
     }
 
-    let wantedPath: string;
-    try {
-      wantedPath = decodeURIComponent(projectPath);
-    } catch {
-      wantedPath = projectPath;
-    }
+    // React Router already decoded the segment, so this is the path itself.
+    // Decoding it a second time would corrupt any folder whose name contains a
+    // percent sign - `A:\50%%20done` would turn into `A:\50 done`.
+    const wantedPath = projectPath;
 
     const match = projects.find((project) => {
       const candidate = String(project.fullPath || project.path || '');

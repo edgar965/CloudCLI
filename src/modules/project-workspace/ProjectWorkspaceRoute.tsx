@@ -14,7 +14,7 @@ import ProjectWorkspaceShell from '@/modules/project-workspace/ProjectWorkspaceS
 
 const MemoizedProjectWorkspaceRouteContent = memo(ProjectWorkspaceRouteContent);
 
-/** This module's only public export: rendered by App for the "/" and "/session/:sessionId" routes. */
+/** This module's only public export: rendered by App for "/", "/session/:sessionId" and "/project/:projectPath". */
 export default function ProjectWorkspaceRoute() {
   return (
     <SessionProtectionProvider>
@@ -27,7 +27,10 @@ export default function ProjectWorkspaceRoute() {
 
 function ProjectWorkspaceRouteContent() {
   const navigate = useNavigate();
-  const { sessionId } = useParams<{ sessionId?: string }>();
+  // Both route parameters, not just the session: a launcher opens a folder with
+  // /project/<url-encoded path>, and dropping that parameter here left the
+  // start address on the project list with nothing selected.
+  const { sessionId, projectPath } = useParams<{ sessionId?: string; projectPath?: string }>();
   const { isMobile } = useDeviceSettings({ trackPWA: false });
   const { ws, sendMessage, subscribe } = useWebSocket();
   const { isSessionProcessing } = useSessionProtectionActions();
@@ -37,6 +40,7 @@ function ProjectWorkspaceRouteContent() {
   return (
     <ProjectsStateProvider
       sessionId={sessionId}
+      projectPath={projectPath}
       navigate={navigate}
       subscribe={subscribe}
       isMobile={isMobile}
