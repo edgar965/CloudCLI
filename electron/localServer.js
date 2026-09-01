@@ -9,7 +9,6 @@ import { ServerInstaller } from './serverInstaller.js';
 
 const DEFAULT_PORT = 3001;
 const HOST = '127.0.0.1';
-const DISPLAY_HOST = 'localhost';
 const HEALTH_TIMEOUT_MS = 1000;
 const SERVER_START_TIMEOUT_MS = 30000;
 const MAX_STARTUP_LOG_LINES = 300;
@@ -159,16 +158,18 @@ function getPortFromUrl(baseUrl) {
   }
 }
 
+/**
+ * The address the window actually opens.
+ *
+ * It used to rewrite 127.0.0.1 to "localhost", which reads nicer and cost the
+ * login: the two names are separate browser origins, so a token stored under
+ * one is invisible under the other, and anything that reached the server by
+ * its real address landed on "Your session expired". On Windows it also made
+ * every request wait out a failed IPv6 attempt first - the server listens on
+ * IPv4 only, while "localhost" resolves to ::1 ahead of 127.0.0.1.
+ */
 function getDisplayUrl(baseUrl) {
-  try {
-    const parsed = new URL(baseUrl);
-    if (parsed.hostname === HOST) {
-      parsed.hostname = DISPLAY_HOST;
-    }
-    return stripTrailingSlash(parsed.toString());
-  } catch {
-    return baseUrl;
-  }
+  return stripTrailingSlash(baseUrl);
 }
 
 async function pathExists(filePath) {
@@ -295,7 +296,7 @@ export class LocalServerController {
     return {
       kind: 'local',
       name: 'Local CloudCLI',
-      url: this.localServerUrl || `http://${DISPLAY_HOST}:${this.localServerPort || DEFAULT_PORT}`,
+      url: this.localServerUrl || `http://${HOST}:${this.localServerPort || DEFAULT_PORT}`,
     };
   }
 
@@ -447,7 +448,7 @@ export class LocalServerController {
 
   async resolveLocalServerUrl() {
     const defaultUrl = `http://${HOST}:${DEFAULT_PORT}`;
-    const defaultDisplayUrl = `http://${DISPLAY_HOST}:${DEFAULT_PORT}`;
+    const defaultDisplayUrl = `http://${HOST}:${DEFAULT_PORT}`;
     const devUrl = process.env.ELECTRON_DEV_URL;
     const forceOwnServer = process.env.ELECTRON_FORCE_OWN_SERVER === '1';
 
@@ -476,7 +477,7 @@ export class LocalServerController {
 
     const port = await chooseServerPort(this.getServerBindHost());
     const serverUrl = `http://${HOST}:${port}`;
-    const displayUrl = `http://${DISPLAY_HOST}:${port}`;
+    const displayUrl = `http://${HOST}:${port}`;
     this.localServerPort = port;
     this.startBundledServer(port, serverEntry);
 
