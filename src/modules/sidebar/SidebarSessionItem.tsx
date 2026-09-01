@@ -264,7 +264,11 @@ function SidebarSessionItem({
         <div
           className={cn(
             'p-2 mx-3 my-0.5 rounded-md bg-card border active:scale-[0.98] transition-all duration-150 relative',
-            isSelected ? 'bg-primary/5 border-primary/20' : '',
+            // Same mark as the desktop row: a bar in the accent colour and a
+            // tinted background. At 5% the open session was all but invisible.
+            isSelected
+              ? 'border-primary/30 bg-primary/15 before:absolute before:left-0 before:top-1/2 before:h-6 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-primary'
+              : '',
             !isSelected && isProcessing
               ? 'border-border/60 bg-muted/20'
               : !isSelected && sessionView.isActive
@@ -277,7 +281,7 @@ function SidebarSessionItem({
             <div
               className={cn(
                 'w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0',
-                isSelected ? 'bg-primary/10' : 'bg-muted/50',
+                isSelected ? 'bg-primary/25' : 'bg-muted/50',
               )}
             >
               <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
@@ -286,7 +290,12 @@ function SidebarSessionItem({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <div
-                  className="min-w-0 flex-1 truncate text-sm font-normal text-foreground"
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-sm text-foreground',
+                    // The open conversation reads as open at a glance, without
+                    // having to compare background tints.
+                    isSelected ? 'font-medium' : 'font-normal',
+                  )}
                   title={sessionView.sessionName}
                 >
                   {sessionView.sessionName}
@@ -534,7 +543,7 @@ function SidebarSessionItem({
                 selection && 'cursor-pointer',
                 isPicked
                   ? 'bg-primary text-primary-foreground'
-                  : isSelected ? 'bg-primary/10' : 'bg-muted/50',
+                  : isSelected ? 'bg-primary/25' : 'bg-muted/50',
               )}
             >
               {isPicked ? (
@@ -556,7 +565,12 @@ function SidebarSessionItem({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <div
-                  className="min-w-0 flex-1 truncate text-sm font-normal text-foreground"
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-sm text-foreground',
+                    // The open conversation reads as open at a glance, without
+                    // having to compare background tints.
+                    isSelected ? 'font-medium' : 'font-normal',
+                  )}
                   title={sessionView.sessionName}
                 >
                   {sessionView.sessionName}
