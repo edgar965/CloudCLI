@@ -119,6 +119,34 @@ const wss = createWebSocketServer(server, {
 // Make WebSocket server available to routes
 app.locals.wss = wss;
 
+// Send browser navigations from "localhost" to "127.0.0.1" (31.08.2026).
+//
+// TWO PROBLEMS, ONE CAUSE. The server listens on 127.0.0.1 only, but
+// "localhost" resolves to ::1 first on Windows:
+//
+//   1. LOGIN COMES BACK. The two names are separate browser origins, so the
+//      long-lived UI token stored under 127.0.0.1 is invisible to a tab opened
+//      on localhost - it shows "Your session expired" while the other origin
+//      is signed in. That is what happened here, and HOWTO.de.md already says
+//      "always 127.0.0.1, never localhost" for exactly this reason.
+//   2. EVERY REQUEST PAYS FOR THE FAILED IPv6 ATTEMPT. Measured on this
+//      machine: 313 ms over 127.0.0.1 against 2109 ms over localhost.
+//
+// NAVIGATIONS ONLY, and only GET/HEAD: an API client that deliberately calls
+// localhost carries its token in a header and has no origin problem - it
+// should not be redirected. 308 keeps method and body intact for anything
+// that still follows.
+app.use((req, res, next) => {
+    const host = String(req.headers.host || '');
+    const name = host.split(':')[0].toLowerCase();
+    const wantsPage = String(req.headers.accept || '').includes('text/html');
+    if (name === 'localhost' && wantsPage && (req.method === 'GET' || req.method === 'HEAD')) {
+        const port = host.includes(':') ? ':' + host.split(':')[1] : '';
+        return res.redirect(308, 'http://127.0.0.1' + port + req.originalUrl);
+    }
+    next();
+});
+
 app.use(cors({ exposedHeaders: ['X-Refreshed-Token', 'X-Auth-Error'] }));
 app.use(express.json({
     limit: '50mb',
