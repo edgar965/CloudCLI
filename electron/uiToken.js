@@ -60,12 +60,19 @@ async function readSharedToken() {
 
 async function writeSharedToken(token) {
   try {
-    await fs.mkdir(path.dirname(TOKEN_FILE), { recursive: true });
+    // Owner-only, both times. The file holds a bearer token: written with the
+    // default mask it comes out world-readable on a shared machine, and anyone
+    // who can read it can replay it. The mode on writeFile only applies when
+    // the file is created, so an existing one is corrected explicitly.
+    await fs.mkdir(path.dirname(TOKEN_FILE), { recursive: true, mode: 0o700 });
     await fs.writeFile(
       TOKEN_FILE,
-      `${JSON.stringify({ token, updatedAt: new Date().toISOString() }, null, 2)}\n`,
-      'utf8',
+      `${JSON.stringify({ token, updatedAt: new Date().toISOString() }, null, 2)}
+`,
+      { encoding: 'utf8', mode: 0o600 },
     );
+    // A no-op on Windows, where the ACL of the user's profile does this job.
+    await fs.chmod(TOKEN_FILE, 0o600).catch(() => {});
   } catch (error) {
     console.warn('[ui-token] Could not store the shared token:', error.message);
   }

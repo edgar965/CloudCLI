@@ -135,12 +135,19 @@ const token = jwt.sign(
   LAUFZEIT ? { expiresIn: LAUFZEIT } : {},
 );
 
-fs.mkdirSync(path.dirname(TOKEN_DATEI), { recursive: true });
+// Nur fuer den Eigentuemer lesbar: in der Datei steht ein Bearer-Token, und
+// mit der ueblichen Maske geschrieben koennte es auf einem geteilten Rechner
+// jeder lesen und weiterverwenden. `mode` beim Schreiben greift nur beim
+// Anlegen, eine vorhandene Datei wird deshalb ausdruecklich korrigiert.
+fs.mkdirSync(path.dirname(TOKEN_DATEI), { recursive: true, mode: 0o700 });
 fs.writeFileSync(
   TOKEN_DATEI,
-  `${JSON.stringify({ token, username: user.username, updatedAt: new Date().toISOString() }, null, 2)}\n`,
-  'utf8',
+  `${JSON.stringify({ token, username: user.username, updatedAt: new Date().toISOString() }, null, 2)}
+`,
+  { encoding: 'utf8', mode: 0o600 },
 );
+// Unter Windows folgenlos - dort erledigt das die ACL des Benutzerprofils.
+try { fs.chmodSync(TOKEN_DATEI, 0o600); } catch { /* Dateisystem ohne Rechte */ }
 
 if (nurAusgeben) {
   process.stdout.write(`${token}\n`);
