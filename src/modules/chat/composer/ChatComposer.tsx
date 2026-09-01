@@ -16,7 +16,6 @@ import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable, useVoiceBackendReady } from '@/modules/chat/hooks/useVoiceAvailable';
 import { isSpeechRecognitionSupported, useSpeechRecognition } from '@/modules/chat/hooks/useSpeechRecognition';
 import { useClaudeSpeech } from '@/modules/chat/hooks/useClaudeSpeech';
-import { safeLocalStorage } from '@/modules/chat/utils/chatStorage';
 import type { QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
 import {
   PromptInput,
@@ -29,6 +28,7 @@ import {
   PromptInputSubmit,
 } from '@/modules/chat/composer/PromptInput';
 import { usePushToTalkKey } from '@/modules/chat/hooks/usePushToTalkKey';
+import { useSelectedProvider } from '@/shared/hooks/useSelectedProvider';
 
 import CommandMenu from '@/modules/chat/composer/CommandMenu';
 import ActivityIndicator from '@/modules/chat/composer/ActivityIndicator';
@@ -263,10 +263,10 @@ export default function ChatComposer({
   //             (VOICE_API_BASE_URL - a groq or openai key, say).
   //   browser   otherwise the browser's own recognition, as the Chrome
   //             extension uses. Present in Chrome, usually silent in Electron.
-  // The provider is read where the chat itself keeps it (useChatProviderState);
-  // the composer only receives a display label.
-  const isClaude = (safeLocalStorage.getItem('selected-provider') || 'claude') === 'claude';
-  const useClaudeVoice = isClaude;
+  // The provider is read from the shared preference store, which is where it
+  // lives since it moved out of localStorage - the old `selected-provider` key
+  // is no longer written, so reading it meant every profile looked like Claude.
+  const useClaudeVoice = useSelectedProvider() === 'claude';
   const useBrowserVoice = !useClaudeVoice && !voiceBackendReady && isSpeechRecognitionSupported();
   const activeVoice = useClaudeVoice ? claudeVoice : useBrowserVoice ? browserVoice : backendVoice;
   const { state: voiceState, toggle: voiceToggle, stop: voiceStop, start: voiceStart } = activeVoice;
@@ -444,7 +444,6 @@ export default function ChatComposer({
           )}
 
           <input {...getInputProps()} />
-
 
         <PromptInputFooter className="border-b border-t-0">
           {/* The tools give way, the send side does not: on a narrow
