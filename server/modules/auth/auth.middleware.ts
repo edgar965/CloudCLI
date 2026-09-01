@@ -2,6 +2,7 @@
 import jwt from 'jsonwebtoken';
 
 import { IS_PLATFORM } from '@/shared/utils.js';
+import { LOGIN_DISABLED } from '@/shared/localLogin.js';
 
 import { userDb, appConfigDb } from '../database/index.js';
 
@@ -24,18 +25,24 @@ const validateApiKey = (req, res, next) => {
 
 // JWT authentication middleware
 const authenticateToken = async (req, res, next) => {
-  // Platform mode:  use single database user
-  if (IS_PLATFORM) {
+  // Platform mode, and a local server whose login was switched off: both
+  // answer as the single database user.
+  if (IS_PLATFORM || LOGIN_DISABLED) {
     try {
       const user = userDb.getFirstUser();
       if (!user) {
-        return res.status(500).json({ error: 'Platform mode: No user found in database' });
+        // Nobody has registered yet: the setup screen has to run, and it is
+        // the one thing this bypass must not skip past.
+        return res.status(401).json({
+          error: 'No user account exists yet. Complete the first-run setup.',
+          code: 'AUTH_SETUP_REQUIRED',
+        });
       }
       req.user = user;
       return next();
     } catch (error) {
-      console.error('Platform mode error:', error);
-      return res.status(500).json({ error: 'Platform mode: Failed to fetch user' });
+      console.error('Single-user authentication failed:', error);
+      return res.status(500).json({ error: 'Could not read the user account' });
     }
   }
 
@@ -133,8 +140,8 @@ const generateToken = (user) => {
 
 // WebSocket authentication function
 const authenticateWebSocket = (token) => {
-  // Platform mode: bypass token validation, return first user
-  if (IS_PLATFORM) {
+  // Platform mode, and a local server whose login was switched off.
+  if (IS_PLATFORM || LOGIN_DISABLED) {
     try {
       const user = userDb.getFirstUser();
       if (user) {
@@ -142,7 +149,7 @@ const authenticateWebSocket = (token) => {
       }
       return null;
     } catch (error) {
-      console.error('Platform mode WebSocket error:', error);
+      console.error('Single-user WebSocket authentication failed:', error);
       return null;
     }
   }

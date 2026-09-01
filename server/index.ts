@@ -17,6 +17,7 @@ import {
 } from '@/modules/providers/index.js';
 import { createWebSocketServer } from '@/modules/websocket/index.js';
 
+import { warnIfLoginDisabled } from '@/shared/localLogin.js';
 import { getConnectableHost, isLoopbackHost, isWildcardHost } from '../shared/networkHosts.js';
 
 import { createGitModule } from './modules/git/index.js';
@@ -56,7 +57,6 @@ import chromeTabsRoutes from './modules/chrome-tabs/chrome-tabs.routes.js';
 import { browserUseService } from './modules/browser-use/browser-use.service.js';
 import { initializeDatabase, sessionsDb } from './modules/database/index.js';
 import { configureWebPush } from './modules/notifications/index.js';
-import { warnIfLoginDisabled } from '@/shared/localLogin.js';
 
 const __dirname = getModuleDirectory(import.meta.url);
 // The server source runs from /server, while the compiled output runs from /dist-server/server.

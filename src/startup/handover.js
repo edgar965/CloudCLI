@@ -4,70 +4,42 @@
  * A desktop window runs with its own Electron profile (the single-instance
  * lock is keyed on `--user-data-dir`), so a fresh profile starts with an empty
  * localStorage: no login, and none of the settings made in another window.
- * The launcher passes them in the address instead, and they are applied before
- * React mounts and reads the store. Everything is removed from the address
- * right after, so nothing lingers in the history or in a shared link.
+ * The launcher passes them in the address instead. Everything is removed from
+ * the address right after, so nothing lingers in the history or in a shared
+ * link.
+ *
+ * Two moments are involved, because the settings no longer live in the same
+ * place. The login token and the per-provider model choice are still
+ * localStorage and are applied before React mounts. Provider, dictation and
+ * the permission bypass moved into `auth.db`, which is only read once there is
+ * a user to read it for - so those are remembered here and written by
+ * `applyHandoverPreferences` after the store has hydrated. Writing them any
+ * earlier means the hydrate lands on top of them and the launcher's settings
+ * silently do nothing.
  */
 
-/** Provider settings that carry a `skipPermissions` flag. */
-const PERMISSION_SETTINGS_KEYS = [
-  'claude-settings',
-  'cursor-tools-settings',
-  'opencode-settings',
+import { readUserPreference, writeUserPreferences } from '@/shared/userSettings';
+
+/** Preference keys holding a `skipPermissions` flag, one per provider. */
+const PERMISSION_PREFERENCE_KEYS = [
+  'claudePermissions',
+  'cursorPermissions',
+  'codexPermissions',
+  'opencodePermissions',
 ];
 
-/** Turns on "skip permissions" for every provider that knows the flag. */
-function applyBypassPermissions() {
-  for (const key of PERMISSION_SETTINGS_KEYS) {
-    let settings = {};
-    try {
-      settings = JSON.parse(localStorage.getItem(key) || '{}') || {};
-    } catch {
-      // A damaged entry is replaced rather than kept.
-      settings = {};
-    }
-
-    localStorage.setItem(key, JSON.stringify({
-      ...settings,
-      skipPermissions: true,
-      lastUpdated: new Date().toISOString(),
-    }));
-  }
-}
+/** What the address asked for, applied once the preference store is ready. */
+let pendingPreferences = null;
 
 /**
- * Turns dictation on for this profile.
+ * Provider, model and reasoning effort, in the keys the chat itself uses.
  *
- * A profile that predates the default carries `voiceEnabled: false` written
- * out explicitly - the defaults land in localStorage the moment any other
- * preference is touched - and then the mic never appears no matter what the
- * default says. A launcher can set it straight.
- */
-function applyVoiceEnabled(enabled) {
-  let preferences = {};
-  try {
-    preferences = JSON.parse(localStorage.getItem('uiPreferences') || '{}') || {};
-  } catch {
-    preferences = {};
-  }
-
-  localStorage.setItem('uiPreferences', JSON.stringify({ ...preferences, voiceEnabled: enabled }));
-}
-
-/**
- * Provider, model and reasoning effort, in the keys the chat itself writes.
- *
- * Taken from `useChatProviderState`, not invented here: the provider lives in
- * `selected-provider`, the model in `<provider>-model` and the effort in
- * `<provider>-effort`. Writing the same keys means the menus next to the
- * message box come up on those values.
+ * Model and effort are read from localStorage by `useChatProviderState`
+ * (`<provider>-model`, `<provider>-effort`), so they are written here directly.
+ * The provider itself is a stored preference and goes through the store.
  */
 function applyModelChoice(provider, model, effort) {
-  if (provider) {
-    localStorage.setItem('selected-provider', provider);
-  }
-
-  const target = provider || localStorage.getItem('selected-provider') || 'claude';
+  const target = provider || readUserPreference('selectedProvider', null) || 'claude';
   if (model) {
     localStorage.setItem(`${target}-model`, model);
   }
@@ -80,11 +52,11 @@ function applyModelChoice(provider, model, effort) {
  * Reads the handover parameters from the start url and applies them.
  *
  * `token` is a login handed over from a launcher, `bypass=1` turns off the
- * permission prompts the same way the setting in the ui does, and
- * `provider`/`model`/`effort` preselect what a fresh profile would otherwise
- * fall back to. Values are not checked against the catalog here - the menus
- * show what the provider actually offers, and an unknown one is visible there
- * rather than silently swallowed.
+ * permission prompts the same way the setting in the ui does, `voice` switches
+ * dictation, and `provider`/`model`/`effort` preselect what a fresh profile
+ * would otherwise fall back to. Values are not checked against the catalog
+ * here - the menus show what the provider actually offers, and an unknown one
+ * is visible there rather than silently swallowed.
  */
 export function applyUrlHandover() {
   try {
@@ -101,9 +73,6 @@ export function applyUrlHandover() {
       startUrl.searchParams.delete('token');
     }
 
-    if (bypass === '1' || bypass === 'true') {
-      applyBypassPermissions();
-    }
     if (bypass !== null) {
       startUrl.searchParams.delete('bypass');
     }
@@ -116,14 +85,63 @@ export function applyUrlHandover() {
     }
 
     if (voice !== null) {
-      applyVoiceEnabled(voice === '1' || voice === 'true');
       startUrl.searchParams.delete('voice');
     }
+
+    pendingPreferences = {
+      provider: provider || null,
+      bypass: bypass === '1' || bypass === 'true',
+      voice: voice === null ? null : voice === '1' || voice === 'true',
+    };
 
     if (token || bypass !== null || provider || model || effort || voice !== null) {
       window.history.replaceState({}, '', `${startUrl.pathname}${startUrl.search}${startUrl.hash}`);
     }
   } catch (error) {
     console.warn('Could not read the handover from the address:', error);
+  }
+}
+
+/**
+ * Writes the handed-over settings into the preference store.
+ *
+ * Called right after the store has read the server's copy, so these values win
+ * over what the profile had - that is the point of putting them in the start
+ * url. Runs once: a later hydrate (another sign-in on this device) must not
+ * silently re-apply an address the user has long since navigated away from.
+ */
+export function applyHandoverPreferences() {
+  const handover = pendingPreferences;
+  pendingPreferences = null;
+  if (!handover) {
+    return;
+  }
+
+  try {
+    const updates = {};
+
+    if (handover.provider) {
+      updates.selectedProvider = handover.provider;
+    }
+
+    if (handover.bypass) {
+      for (const key of PERMISSION_PREFERENCE_KEYS) {
+        const stored = readUserPreference(key, {});
+        const settings = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+        updates[key] = { ...settings, skipPermissions: true };
+      }
+    }
+
+    if (handover.voice !== null) {
+      const stored = readUserPreference('uiPreferences', {});
+      const preferences = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+      updates.uiPreferences = { ...preferences, voiceEnabled: handover.voice };
+    }
+
+    if (Object.keys(updates).length > 0) {
+      writeUserPreferences(updates);
+    }
+  } catch (error) {
+    console.warn('Could not apply the handover settings:', error);
   }
 }

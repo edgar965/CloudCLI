@@ -6,6 +6,7 @@ import { api } from '@/shared/api';
 import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_REFRESHED_EVENT, getAuthTokenRefreshDelay, isValidRefreshedToken, storeAuthToken } from '@/shared/authToken';
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
+import { applyHandoverPreferences } from '@/startup/handover.js';
 /** The signed-in account held by AuthContext - a required `username` plus an optional id and any additional fields the auth API returns - and should be read through `useAuth()` rather than re-derived from raw auth responses. */
 type AuthUser = {
   id?: number | string;
@@ -34,6 +35,8 @@ type AuthSessionPayload = {
 
 type AuthStatusPayload = {
   needsSetup?: boolean;
+  /** Server runs without a sign-in: everything is the single local user. */
+  loginDisabled?: boolean;
 };
 
 type AuthUserPayload = {
@@ -54,6 +57,8 @@ type AuthContextValue = {
   token: string | null;
   isLoading: boolean;
   needsSetup: boolean;
+  /** No sign-in required: the server answers as the single local user. */
+  loginDisabled: boolean;
   hasCompletedOnboarding: boolean;
   error: string | null;
   login: (username: string, password: string) => Promise<AuthActionResult>;
@@ -109,6 +114,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(() => readStoredToken());
   const [isLoading, setIsLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
+  // Server runs without a sign-in; read from /api/auth/status, and what tells
+  // the websocket it may connect without a token.
+  const [loginDisabled, setLoginDisabled] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,7 +144,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!userKey) {
       return;
     }
-    void hydrateUserPreferences();
+    // A launcher's settings are written on top of the server's copy, not
+    // before it: applied any earlier, the hydrate lands on them and the start
+    // url quietly does nothing.
+    void hydrateUserPreferences().then(applyHandoverPreferences);
     void hydrateChatDrafts();
   }, [userKey]);
 
@@ -217,8 +228,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       setNeedsSetup(false);
+      setLoginDisabled(Boolean(statusPayload?.loginDisabled));
 
-      if (!token) {
+      // With the login off the server answers as the local user without a
+      // token, so the user is fetched anyway - otherwise the app would sit on
+      // a sign-in screen for a server that has nothing to sign in to.
+      if (!token && !statusPayload?.loginDisabled) {
         return;
       }
 
@@ -355,6 +370,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       token,
       isLoading,
       needsSetup,
+      loginDisabled,
       hasCompletedOnboarding,
       error,
       login,
@@ -367,6 +383,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       hasCompletedOnboarding,
       isLoading,
       login,
+      loginDisabled,
       logout,
       needsSetup,
       refreshOnboardingStatus,

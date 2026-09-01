@@ -1,4 +1,5 @@
 import { AppError } from '@/shared/utils.js';
+import { LOGIN_DISABLED } from '@/shared/localLogin.js';
 
 type AuthUser = {
   id: number | bigint;
@@ -45,6 +46,10 @@ export function createAuthService(dependencies: AuthDependencies) {
       return {
         needsSetup: !dependencies.users.hasUsers(),
         isAuthenticated: false,
+        // The client cannot tell from a token whether one is needed at all,
+        // so the server says so: with the login off there is nothing to sign
+        // in to, and asking would be a dead end.
+        loginDisabled: LOGIN_DISABLED,
       };
     },
 
