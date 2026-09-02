@@ -1,5 +1,6 @@
 import { BrowserView } from 'electron';
 
+import { logConsoleFrom } from './logfile.js';
 import { syncSharedUiToken } from './uiToken.js';
 
 const TARGET_LOAD_TIMEOUT_MS = 20000;
@@ -87,6 +88,10 @@ export class ViewHost {
       void this.openExternalUrl(url).catch((error) => this.showError('Could not open external link', error));
       return { action: 'deny' };
     });
+
+    // Every content view goes through here, so this is the one place that
+    // catches the ui's console - the only account of what the page did.
+    logConsoleFrom(webContents, 'renderer');
   }
 
   detachAll() {

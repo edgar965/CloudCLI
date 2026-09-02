@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { CloudController } from './cloud.js';
+import { desktopLog } from './logfile.js';
 import { DesktopWindowManager } from './desktopWindow.js';
 import { DesktopNotificationsController } from './desktopNotifications.js';
 import { LocalServerController } from './localServer.js';
@@ -967,6 +968,18 @@ async function bootstrap() {
   process.title = APP_NAME;
 
   await app.whenReady();
+
+  // From here on the window has a log to leave behind. Without it a window
+  // started from a launcher has no console at all, and a report of "it hangs"
+  // cannot be checked against anything afterwards.
+  desktopLog.info('main', `CloudCLI ${app.getVersion()} starting - profile ${app.getPath('userData')}`);
+  process.on('uncaughtException', (error) => {
+    desktopLog.error('main', `uncaughtException: ${error?.stack || error}`);
+  });
+  process.on('unhandledRejection', (reason) => {
+    desktopLog.error('main', `unhandledRejection: ${reason?.stack || reason}`);
+  });
+  app.on('before-quit', () => desktopLog.info('main', 'quitting'));
   app.setName(APP_NAME);
   app.setAboutPanelOptions({
     applicationName: APP_NAME,

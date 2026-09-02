@@ -1,5 +1,6 @@
 import { BrowserWindow, Menu, Tray, clipboard, nativeImage, nativeTheme, session, webContents as electronWebContents } from 'electron';
 
+import { logConsoleFrom } from './logfile.js';
 import { ViewHost } from './viewHost.js';
 
 const TITLEBAR_HEIGHT = 44;
@@ -764,6 +765,10 @@ export class DesktopWindowManager {
     this.mainWindow.once('ready-to-show', () => {
       this.mainWindow?.show();
     });
+
+    // The launcher shell loads a local file rather than a content view, so it
+    // never passes through viewHost's configureChildWebContents.
+    logConsoleFrom(this.mainWindow.webContents, 'launcher');
 
     // A loaded document's <title> replaces whatever setTitle() put there -
     // on the launcher that is "CloudCLI Desktop", which would drop the
