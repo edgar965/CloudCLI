@@ -81,7 +81,6 @@ type ChatComposerProps = {
   isEditingSentMessage: boolean;
   onCancelEditMessage: () => void;
   /** Messages waiting to be sent to this session later. */
-  slashCommandsCount: number;
   scheduledMessages: ScheduledMessage[];
   onScheduleMessage: (scheduledFor: Date) => void;
   onCancelScheduledMessage: (id: string) => void;
@@ -154,7 +153,6 @@ export default function ChatComposer({
   queuedDraft,
   isEditingSentMessage,
   onCancelEditMessage,
-  slashCommandsCount,
   scheduledMessages,
   onScheduleMessage,
   onCancelScheduledMessage,
@@ -473,19 +471,14 @@ export default function ChatComposer({
 
             <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage} />
 
+            {/* No count on this button: it opens a menu that lists the
+                commands anyway, and at a glance the badge read as unread
+                messages. The merge brought it back; it stays gone. */}
             <PromptInputButton
               tooltip={{ content: t('input.showAllCommands') }}
               onClick={onToggleCommandMenu}
-              className="relative"
             >
               <MessageSquareIcon />
-              {slashCommandsCount > 0 && (
-                <span
-                  className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground"
-                >
-                  {slashCommandsCount}
-                </span>
-              )}
             </PromptInputButton>
 
             {hasInput && (
@@ -500,7 +493,16 @@ export default function ChatComposer({
 
           </PromptInputTools>
 
-          <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
+          {/* No `ml-auto` here: an auto margin swallows the free space
+              before the tools' `flex-1` can grow into it, which cut the
+              token summary off mid-word. The footer already spaces the
+              two groups with `justify-between`. */}
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+            {/* The hint is the part that may be cut, so it sits here and
+                truncates. Upstream's copy of it carried `basis-full` in a
+                footer that does not wrap, which claimed the whole row and
+                left the tools at width 0 - paperclip, microphone and the
+                browser button were in the DOM but unreachable. */}
             <div
               className={`hidden min-w-0 truncate text-xs text-muted-foreground/50 transition-opacity duration-200 lg:block ${
                 input.trim() && !canQueueDraft ? 'opacity-0' : 'opacity-100'
@@ -568,13 +570,6 @@ export default function ChatComposer({
             </PromptInputSubmit>
           </div>
 
-          <div
-            className={`order-last hidden basis-full px-2 text-center text-xs leading-4 text-muted-foreground/50 transition-opacity duration-200 lg:block ${
-              input.trim() && !canQueueDraft ? 'opacity-0' : 'opacity-100'
-            }`}
-          >
-            {submitHint}
-          </div>
         </PromptInputFooter>
 
           <PromptInputBody>
