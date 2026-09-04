@@ -112,24 +112,21 @@ const authenticateToken = async (req, res, next) => {
 /**
  * How long a login lasts, from `CLOUDCLI_TOKEN_TTL`.
  *
- * The default is finite. It used to be no expiry at all, on the grounds that
- * this server binds to 127.0.0.1 and serves one person on their own machine -
- * but a token that never lapses is one that stays valid wherever it ends up,
- * and the comfort it bought is now covered properly by `CLOUDCLI_NO_LOGIN`,
- * which asks for no sign-in in the first place.
+ * Unset, a login does not expire. This server binds to 127.0.0.1 and serves
+ * one person on their own machine, who does not want to sign in again every
+ * few weeks - being thrown out mid-session is the failure mode that actually
+ * happens here, not a stolen token.
  *
- * Any value `jsonwebtoken` takes works (`7d`, `12h`). A token that never
- * expires is still available, but only by asking for it by name - `never`,
- * `none`, `infinite`, `nie` or `unbegrenzt` - never by leaving the variable
- * unset. Turn it on only where the server cannot be reached from outside;
- * "Allow LAN Access to Local Server" in the desktop menu is exactly the case
- * where it must stay off.
+ * A finite lifetime is one variable away, in any form `jsonwebtoken` takes
+ * (`30d`, `12h`), and is worth setting where the server can be reached from
+ * outside - "Allow LAN Access to Local Server" in the desktop menu is exactly
+ * that case. The words `never`, `none`, `infinite`, `nie` and `unbegrenzt`
+ * (and `0`) name the default explicitly.
  */
-const DEFAULT_TOKEN_TTL = '30d';
 const TOKEN_TTL_RAW = (process.env.CLOUDCLI_TOKEN_TTL ?? '').trim();
-const TOKEN_NEVER_EXPIRES = ['0', 'unbegrenzt', 'nie', 'never', 'none', 'infinite']
-  .includes(TOKEN_TTL_RAW.toLowerCase());
-const TOKEN_TTL = TOKEN_TTL_RAW || DEFAULT_TOKEN_TTL;
+const TOKEN_NEVER_EXPIRES =
+  TOKEN_TTL_RAW === '' ||
+  ['0', 'unbegrenzt', 'nie', 'never', 'none', 'infinite'].includes(TOKEN_TTL_RAW.toLowerCase());
 
 // Generate JWT token
 const generateToken = (user) => {
@@ -139,7 +136,7 @@ const generateToken = (user) => {
       username: user.username
     },
     JWT_SECRET,
-    TOKEN_NEVER_EXPIRES ? {} : { expiresIn: TOKEN_TTL }
+    TOKEN_NEVER_EXPIRES ? {} : { expiresIn: TOKEN_TTL_RAW }
   );
 };
 
