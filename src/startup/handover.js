@@ -28,6 +28,20 @@ const PERMISSION_PREFERENCE_KEYS = [
   'opencodePermissions',
 ];
 
+/**
+ * True when this page is served from the machine it runs on.
+ *
+ * A launcher hands its window a login and a permission bypass through the
+ * start address, which is safe because both ends are the same machine. The
+ * same parameters arriving from a host on the network are not a handover:
+ * a token planted there makes the session someone else's, and `bypass=1`
+ * would turn off every permission prompt before the ui is even up.
+ */
+function isLoopbackOrigin() {
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+}
+
 /** What the address asked for, applied once the preference store is ready. */
 let pendingPreferences = null;
 
@@ -61,8 +75,23 @@ function applyModelChoice(provider, model, effort) {
 export function applyUrlHandover() {
   try {
     const startUrl = new URL(window.location.href);
-    const token = startUrl.searchParams.get('token');
-    const bypass = startUrl.searchParams.get('bypass');
+    // Only a page served from this machine may hand over a login or switch the
+    // permission prompts off. Both are things a launcher on the same machine
+    // does; arriving from anywhere else they are an attack, not a handover -
+    // a link can otherwise plant someone else's token (the session is then
+    // theirs, not the user's) or turn off every prompt before React mounts.
+    const trusted = isLoopbackOrigin();
+    const rawToken = startUrl.searchParams.get('token');
+    const rawBypass = startUrl.searchParams.get('bypass');
+    // Cleared from the address either way: what is not trusted still must not
+    // stay in the url, where a copied link would carry it along.
+    if (rawToken !== null) startUrl.searchParams.delete('token');
+    if (rawBypass !== null) startUrl.searchParams.delete('bypass');
+    if (!trusted && (rawToken !== null || rawBypass !== null)) {
+      console.warn('Ignoring a login or permission bypass from the address: this page is not served locally.');
+    }
+    const token = trusted ? rawToken : null;
+    const bypass = trusted ? rawBypass : null;
     const provider = startUrl.searchParams.get('provider');
     const model = startUrl.searchParams.get('model');
     const effort = startUrl.searchParams.get('effort');
@@ -70,11 +99,6 @@ export function applyUrlHandover() {
 
     if (token) {
       localStorage.setItem('auth-token', token);
-      startUrl.searchParams.delete('token');
-    }
-
-    if (bypass !== null) {
-      startUrl.searchParams.delete('bypass');
     }
 
     if (provider || model || effort) {
@@ -94,7 +118,7 @@ export function applyUrlHandover() {
       voice: voice === null ? null : voice === '1' || voice === 'true',
     };
 
-    if (token || bypass !== null || provider || model || effort || voice !== null) {
+    if (rawToken !== null || rawBypass !== null || provider || model || effort || voice !== null) {
       window.history.replaceState({}, '', `${startUrl.pathname}${startUrl.search}${startUrl.hash}`);
     }
   } catch (error) {

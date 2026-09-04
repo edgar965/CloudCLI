@@ -723,7 +723,11 @@ export function useProjectsState({
   // without being pulled back. The comparison falls back to a case-insensitive
   // match because Windows treats `a:\work` and `A:\work` as one directory.
   useEffect(() => {
-    if (!projectPath || isLoadingProjects || projects.length === 0) {
+    // An empty list is not a reason to wait: `isLoadingProjects` already covers
+    // the time before it has arrived, and stopping here as well meant the
+    // create branch below never ran on a fresh install - the one case where a
+    // launcher points at a directory that has no project row yet.
+    if (!projectPath || isLoadingProjects) {
       return;
     }
 

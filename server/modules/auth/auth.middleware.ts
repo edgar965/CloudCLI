@@ -112,19 +112,24 @@ const authenticateToken = async (req, res, next) => {
 /**
  * How long a login lasts, from `CLOUDCLI_TOKEN_TTL`.
  *
- * The default is no expiry at all: this server binds to 127.0.0.1 and serves
- * one person on their own machine, where being logged out on a schedule buys
- * no security worth the interruption - and every desktop profile pays it
- * separately. A token without `exp` never lapses; `jwt.verify` then checks
- * the signature alone.
+ * The default is finite. It used to be no expiry at all, on the grounds that
+ * this server binds to 127.0.0.1 and serves one person on their own machine -
+ * but a token that never lapses is one that stays valid wherever it ends up,
+ * and the comfort it bought is now covered properly by `CLOUDCLI_NO_LOGIN`,
+ * which asks for no sign-in in the first place.
  *
- * Set a real value (`7d`, `12h`, anything `jsonwebtoken` takes) when the
- * server is reachable beyond this machine - "Allow LAN Access to Local
- * Server" in the desktop menu does exactly that.
+ * Any value `jsonwebtoken` takes works (`7d`, `12h`). A token that never
+ * expires is still available, but only by asking for it by name - `never`,
+ * `none`, `infinite`, `nie` or `unbegrenzt` - never by leaving the variable
+ * unset. Turn it on only where the server cannot be reached from outside;
+ * "Allow LAN Access to Local Server" in the desktop menu is exactly the case
+ * where it must stay off.
  */
+const DEFAULT_TOKEN_TTL = '30d';
 const TOKEN_TTL_RAW = (process.env.CLOUDCLI_TOKEN_TTL ?? '').trim();
-const TOKEN_NEVER_EXPIRES = ['', '0', 'unbegrenzt', 'nie', 'never', 'none', 'infinite']
+const TOKEN_NEVER_EXPIRES = ['0', 'unbegrenzt', 'nie', 'never', 'none', 'infinite']
   .includes(TOKEN_TTL_RAW.toLowerCase());
+const TOKEN_TTL = TOKEN_TTL_RAW || DEFAULT_TOKEN_TTL;
 
 // Generate JWT token
 const generateToken = (user) => {
@@ -134,7 +139,7 @@ const generateToken = (user) => {
       username: user.username
     },
     JWT_SECRET,
-    TOKEN_NEVER_EXPIRES ? {} : { expiresIn: TOKEN_TTL_RAW }
+    TOKEN_NEVER_EXPIRES ? {} : { expiresIn: TOKEN_TTL }
   );
 };
 
